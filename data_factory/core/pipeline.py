@@ -112,6 +112,7 @@ class Pipeline:
             needs_transcribe=(content_type == "video"),
         )
 
+        import data_factory.processors  # noqa: F401 — register Processor subclasses
         from data_factory.processors.base import PROCESSOR_REGISTRY
         proc_cls = PROCESSOR_REGISTRY.get(step)
         if proc_cls is None:

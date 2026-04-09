@@ -225,5 +225,41 @@ def import_cmd(ctx, platform, source):
             click.echo(f"  Import not supported for {platform}", err=True)
 
 
+@main.group()
+def schedule():
+    """Scheduler commands."""
+
+
+@schedule.command()
+@click.option("--foreground", is_flag=True, default=False)
+@click.pass_context
+def start(ctx, foreground):
+    """Start the scheduler."""
+    config = _get_config(ctx)
+    from data_factory.core.pipeline import Pipeline
+    from data_factory.core.scheduler import DataFactoryScheduler
+
+    pipeline = Pipeline(config)
+    sched = DataFactoryScheduler(config, pipeline)
+    click.echo("Starting scheduler...")
+    sched.start()
+
+
+@schedule.command(name="list")
+@click.pass_context
+def list_jobs(ctx):
+    """List scheduled jobs."""
+    config = _get_config(ctx)
+    for job in config.scheduler.jobs:
+        click.echo(f"  {job.name}: {job.platform} search '{job.query}' cron={job.cron}")
+
+
+@schedule.command()
+@click.pass_context
+def stop(ctx):
+    """Stop the scheduler (sends signal)."""
+    click.echo("Send Ctrl+C to the running scheduler process to stop it.")
+
+
 if __name__ == "__main__":
     main()
