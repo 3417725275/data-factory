@@ -188,7 +188,7 @@ Agent 用 LLM 能力头脑风暴候选关键词（中英文混合），展示给
 
 ### Step 2：搜索并全量抓取
 
-遍历关键词 × 平台执行搜索，与 `global_index.json` 对比去重，新 URL 直接全量抓取，不暂停等待用户确认。
+遍历关键词 × 平台执行搜索，与各平台 `index.json` 中的已有 URL 对比去重，新 URL 直接全量抓取，不暂停等待用户确认。
 
 ```bash
 data-factory --config config.yaml search <platform> "<keyword>" --limit <N>

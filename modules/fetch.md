@@ -23,13 +23,17 @@ data-factory --config config.yaml search <platform> "<keyword>" --limit <N>
 
 ### 2.2 去重
 
-读取 `global_index.json`（如存在），将搜索到的 URL 与已有记录对比，过滤掉已抓取的 URL。
+遍历各平台的 `<platform>/index.json` 文件，收集所有已抓取条目的 `url` 字段，与搜索到的 URL 对比，过滤掉已存在的 URL。
 
-如果 `global_index.json` 不存在，先执行：
+如果平台目录下没有 `index.json`，先执行索引重建：
 
 ```bash
 data-factory --config config.yaml index rebuild --all
 ```
+
+> **注意**：`global_index.json` 仅存储各平台的条目数和更新时间，不含具体 URL。
+> 去重必须读取各平台的 `index.json`（其中 `items` 字典的每个条目包含 `url` 字段），
+> 或直接检查 `<platform>/<item_id>/meta.json` 是否存在。
 
 ### 2.3 全量抓取
 
@@ -44,6 +48,10 @@ data-factory --config config.yaml fetch --from .fetch_urls.tmp
 在内存中记录本轮抓取的 URL 列表，供关键词发现阶段使用。
 
 **不暂停等待用户确认**，除非用户主动中断。
+
+> **已存在条目的处理**：对于去重后仍传入 `fetch` 的已有条目（如去重遗漏），
+> `data-factory` 不会重新抓取内容，而是自动触发评论刷新（`run_refresh`）。
+> 如需强制重新抓取，使用 `--force` 参数。
 
 ## Step 3：错误处理
 
@@ -81,7 +89,7 @@ data-factory --config config.yaml refresh
 📥 抓取结果
 - 成功: <N> 条（YouTube <n1>, Reddit <n2>, ...）
 - 失败: <N> 条（原因汇总）
-- 跳过: <N> 条（已存在）
+- 已存在: <N> 条（跳过全量抓取，自动刷新评论）
 
 💬 评论刷新
 - 已刷新: <N> 条

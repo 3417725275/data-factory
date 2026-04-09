@@ -259,6 +259,16 @@ network:
 | `DATA_FACTORY_OUTPUT_DIR` | `output_dir` | 输出目录路径 |
 | `DATA_FACTORY_CONFIG` | — | 配置文件路径（当 `--config` 未指定时） |
 
+## AI Skill
+
+本项目可作为 AI Skill 使用，让 AI Agent（Cursor、Claude、Claude Code 等）自动驱动数据抓取全流程。
+
+- 入口文件：[`SKILL.md`](SKILL.md) — AI Agent 读取此文件即可开始工作
+- 操作模块：`modules/` — 初始化、抓取、关键词发现、经验管理、调度管理
+- 平台知识：`knowledge/` — 跨项目共享的平台经验和经验记录模板
+
+详见 `SKILL.md`。
+
 ## 前置依赖
 
 - **Python 3.11+**

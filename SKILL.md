@@ -28,7 +28,10 @@ pip install -e .
 
 ### 2. 读取平台知识
 
-读取本仓库中的 `knowledge/platform_quirks.md`，了解各平台已知特性和注意事项。
+读取 **data-factory 安装目录**（即本文件 `SKILL.md` 所在目录）下的 `knowledge/platform_quirks.md`，了解各平台已知特性和注意事项。
+
+> 此路径是相对于 data-factory 仓库根目录的，不是用户的话题工作目录。
+> 如果 Agent 的 cwd 是话题目录，需要先定位 data-factory 仓库路径再读取。
 
 ### 3. 检测项目状态
 
@@ -73,6 +76,9 @@ data-factory --config config.yaml search <platform> "<query>" --limit <N>
 ```
 
 输出：每行一个 URL。
+
+> **注意**：`search` 支持 `--fetch` 参数可搜索后直接抓取，但标准流程**不应使用**此选项。
+> 标准流程为 `search` → 去重 → `fetch --from`，确保与已有数据对比后再抓取。
 
 ### 抓取
 
