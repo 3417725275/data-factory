@@ -103,6 +103,7 @@ npm install -g @jackwener/opencli
 4. **知识先行**：每次启动时读取 `experiences.md` 和 `knowledge/platform_quirks.md`，在操作前检查是否有已知问题
 5. **状态同步**：每轮操作结束后自动更新 `README.md` 中的统计信息
 6. **错误即经验**：任何失败都应记录到 `experiences.md`，查阅已有经验寻找方案
+7. **串行执行**：所有 `data-factory` CLI 命令必须逐条串行执行——等待当前命令完成后再启动下一条，禁止同时运行多个 `data-factory` 进程。`opencli` 依赖单一 Chrome 浏览器实例，并发调用会导致 tab 冲突和任务失败
 
 ## CLI 速查表
 

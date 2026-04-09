@@ -21,6 +21,9 @@ data-factory --config config.yaml search <platform> "<keyword>" --limit <N>
 
 `search` 命令输出每行一个 URL。收集所有 URL。
 
+> **⚠️ 串行执行**：逐平台、逐关键词串行执行搜索，每条命令等待完成后再执行下一条。
+> 禁止并行启动多个 `search` 进程（opencli 共享同一个 Chrome 实例，并发会导致 tab 冲突）。
+
 ### 2.2 去重
 
 遍历各平台的 `<platform>/index.json` 文件，收集所有已抓取条目的 `url` 字段，与搜索到的 URL 对比，过滤掉已存在的 URL。
@@ -60,6 +63,9 @@ data-factory --config config.yaml fetch --from .fetch_urls.tmp
 > 代码内部会自动进行 URL 规范化（如将 `search_result` 转为 `explore`），但会保留鉴权参数。
 
 在内存中记录本轮抓取的 URL 列表，供关键词发现阶段使用。
+
+> **⚠️ 串行执行**：不要为不同平台或不同 URL 并行启动多个 `fetch` 进程。
+> 推荐将所有去重后的 URL 传入单条 `fetch` 命令（方式 1 或方式 2），命令内部会逐个串行处理。
 
 **不暂停等待用户确认**，除非用户主动中断。
 

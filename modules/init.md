@@ -70,6 +70,8 @@
 data-factory --config config.yaml search <platform> "<keyword>" --limit 3
 ```
 
+> **⚠️ 串行执行**：逐平台串行执行试搜索，每条命令完成后再执行下一条，不要并行。
+
 > 注意：此时 config.yaml 尚未生成。Agent 需要先创建一个临时的最小化 config.yaml
 > （仅包含 `output_dir` 和 `platforms` 部分），用于执行试搜索。
 > 试搜索完成后，临时配置会被完整配置覆盖。

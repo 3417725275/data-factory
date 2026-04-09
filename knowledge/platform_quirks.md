@@ -76,6 +76,7 @@
 
 ## 通用
 
+- **⚠️ 串行执行（最重要）**：所有 `data-factory` CLI 命令必须逐条串行执行，禁止并发。`opencli` 依赖单一 Chrome 浏览器实例，同时运行多个命令会导致 "No tab with id"、"No window with id" 等 tab 冲突错误。搜索、抓取、刷新均需等待上一条命令完成后再执行下一条
 - **ffmpeg**：YouTube / Bilibili / TikTok 视频下载后需要 ffmpeg 合并音视频流。缺少 ffmpeg 时自动降级为 `best[ext=mp4]` 预合并格式（画质可能较低）
 - **Windows `shell=True`**：在 Windows 上调用 `opencli`（.cmd 文件）时必须用 `shell=True`，且 URL 中的 `&` 等特殊字符需显式引号包裹
 - **编码**：Windows 默认 GBK 编码，subprocess 调用需指定 `encoding="utf-8", errors="replace"`
