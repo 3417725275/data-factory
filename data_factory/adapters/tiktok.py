@@ -9,7 +9,7 @@ from pathlib import Path
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
@@ -46,11 +46,10 @@ class TikTokAdapter(PlatformAdapter, adapter_name="tiktok"):
             info = {}
 
         description = info.get("desc", info.get("description", ""))
-        write_text(output_dir / "description.txt", description)
+        desc_file = maybe_write_text(output_dir / "description.txt", description)
 
-        comments = []
+        comments: list[dict] = []
         log.warning("TikTok comments not available via opencli for %s", url)
-        write_json(output_dir / "comments.json", comments)
 
         video_file = download_video(url, assets_dir)
 
@@ -64,6 +63,12 @@ class TikTokAdapter(PlatformAdapter, adapter_name="tiktok"):
             "last_comment_count": 0,
         }
 
+        files: dict = {"assets": [f"assets/{video_file.name}"] if video_file else []}
+        if desc_file:
+            files["description"] = desc_file
+        if video_file:
+            files["video"] = f"assets/{video_file.name}"
+
         meta = {
             "id": video_id,
             "platform": "tiktok",
@@ -76,16 +81,11 @@ class TikTokAdapter(PlatformAdapter, adapter_name="tiktok"):
             "author": info.get("author", info.get("nickname", "")),
             "published_at": info.get("createTime", ""),
             "language": "",
-            "content_fetched": True,
+            "content_fetched": bool(description and description.strip()),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {
-                "description": "description.txt",
-                "comments": "comments.json",
-                "assets": [f"assets/{video_file.name}"] if video_file else [],
-                **({"video": f"assets/{video_file.name}"} if video_file else {}),
-            },
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [],
             "platform_meta": {

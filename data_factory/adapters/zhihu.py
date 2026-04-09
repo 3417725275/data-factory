@@ -11,7 +11,7 @@ from pathlib import Path
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, write_text, maybe_write_text, maybe_write_json, now_iso
 
 log = logging.getLogger(__name__)
 
@@ -275,8 +275,7 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
         if not content and info:
             content = info.get("content", info.get("title", ""))
 
-        write_text(output_dir / "content.md", content)
-        write_json(output_dir / "comments.json", [])
+        content_file = maybe_write_text(output_dir / "content.md", content)
 
         from datetime import datetime, timedelta, timezone
         refresh_state = {
@@ -293,6 +292,10 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
             if first_line.startswith("#"):
                 title = first_line.lstrip("# ").strip()
 
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+
         meta = {
             "id": zhihu_id,
             "platform": "zhihu",
@@ -305,11 +308,11 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
             "author": info.get("author", ""),
             "published_at": info.get("publish_time", ""),
             "language": "zh",
-            "content_fetched": True,
+            "content_fetched": bool(content_file),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.md", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [],
             "platform_meta": {
@@ -358,13 +361,12 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
 
         header = f"# {title}\n\n" if title else f"# 知乎问题 {question_id}\n\n"
         content = header + "\n\n---\n\n".join(parts) if parts else header
-        write_text(output_dir / "content.md", content)
+        content_file = maybe_write_text(output_dir / "content.md", content)
 
-        write_json(output_dir / "answers.json", answers)
+        answers_file = maybe_write_json(output_dir / "answers.json", answers)
 
-        comments = []
+        comments: list[dict] = []
         log.warning("Zhihu comments not available via opencli for %s", url)
-        write_json(output_dir / "comments.json", comments)
 
         if not title:
             title = _summarize_as_title(answers, question_id)
@@ -378,6 +380,12 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
             "last_comment_count": 0,
         }
 
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+        if answers_file:
+            files["answers"] = answers_file
+
         meta = {
             "id": zhihu_id,
             "platform": "zhihu",
@@ -390,11 +398,11 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
             "author": authors[0] if authors else "",
             "published_at": "",
             "language": "zh",
-            "content_fetched": True,
+            "content_fetched": bool(content_file),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.md", "answers": "answers.json", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [],
             "platform_meta": {
@@ -415,8 +423,14 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
         data = json.loads(file_path.read_text(encoding="utf-8"))
 
         content = data.get("content", "")
-        write_text(output_dir / "content.md", content)
-        write_json(output_dir / "comments.json", data.get("comments", []))
+        content_file = maybe_write_text(output_dir / "content.md", content)
+        comments_file = maybe_write_json(output_dir / "comments.json", data.get("comments", []))
+
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+        if comments_file:
+            files["comments"] = comments_file
 
         meta = {
             "id": data.get("id", file_path.stem),
@@ -430,11 +444,11 @@ class ZhihuAdapter(PlatformAdapter, adapter_name="zhihu"):
             "author": data.get("author", ""),
             "published_at": data.get("created", ""),
             "language": "zh",
-            "content_fetched": True,
+            "content_fetched": bool(content_file),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.md", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": None,
             "comment_history": [],
             "platform_meta": data.get("platform_meta", {}),

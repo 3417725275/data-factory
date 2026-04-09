@@ -9,7 +9,7 @@ from pathlib import Path
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 
 log = logging.getLogger(__name__)
 
@@ -65,13 +65,13 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
         info = self._get_note_info(normalized_url, note_id)
 
         content = info.get("content", info.get("desc", ""))
-        write_text(output_dir / "content.txt", content)
+        content_file = maybe_write_text(output_dir / "content.txt", content)
 
         try:
             comments = self.fetch_comments(normalized_url, note_id)
         except Exception:
             comments = []
-        write_json(output_dir / "comments.json", comments)
+        comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
         downloaded_assets = self._download_media(normalized_url, note_id, assets_dir)
 
@@ -91,6 +91,12 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
             "last_comment_count": len(comments),
         }
 
+        files: dict = {"assets": downloaded_assets}
+        if content_file:
+            files["content"] = content_file
+        if comments_file:
+            files["comments"] = comments_file
+
         meta = {
             "id": note_id,
             "platform": "xiaohongshu",
@@ -103,15 +109,11 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
             "author": info.get("author", info.get("nickname", "")),
             "published_at": info.get("time", info.get("published_at", "")),
             "language": "zh",
-            "content_fetched": bool(content),
+            "content_fetched": bool(content_file),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": bool(downloaded_assets),
-            "files": {
-                "content": "content.txt",
-                "comments": "comments.json",
-                "assets": downloaded_assets,
-            },
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [{"timestamp": now_iso(), "count": len(comments)}],
             "platform_meta": {
@@ -199,8 +201,14 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
         data = json.loads(file_path.read_text(encoding="utf-8"))
 
         content = data.get("content", data.get("desc", ""))
-        write_text(output_dir / "content.txt", content)
-        write_json(output_dir / "comments.json", data.get("comments", []))
+        content_file = maybe_write_text(output_dir / "content.txt", content)
+        comments_file = maybe_write_json(output_dir / "comments.json", data.get("comments", []))
+
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+        if comments_file:
+            files["comments"] = comments_file
 
         meta = {
             "id": data.get("id", file_path.stem),
@@ -214,11 +222,11 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
             "author": data.get("author", ""),
             "published_at": data.get("time", ""),
             "language": "zh",
-            "content_fetched": True,
+            "content_fetched": bool(content_file),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.txt", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": None,
             "comment_history": [],
             "platform_meta": data.get("platform_meta", {}),

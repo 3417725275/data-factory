@@ -9,7 +9,7 @@ from pathlib import Path
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
@@ -61,13 +61,13 @@ class YouTubeAdapter(PlatformAdapter, adapter_name="youtube"):
         info = _field_value_to_dict(raw_info) if isinstance(raw_info, list) else raw_info
 
         description = info.get("description", "")
-        write_text(output_dir / "description.txt", description)
+        desc_file = maybe_write_text(output_dir / "description.txt", description)
 
         try:
             comments = self.fetch_comments(url)
         except Exception:
             comments = []
-        write_json(output_dir / "comments.json", comments)
+        comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
         assets = []
         thumb_url = info.get("thumbnail", "")
@@ -79,17 +79,20 @@ class YouTubeAdapter(PlatformAdapter, adapter_name="youtube"):
         video_file = download_video(url, assets_dir)
 
         transcript_text = self._get_transcript(url)
-        if transcript_text:
-            write_text(output_dir / "transcript.txt", transcript_text)
+        transcript_file = maybe_write_text(output_dir / "transcript.txt", transcript_text)
 
         if video_file:
             assets.append(f"assets/{video_file.name}")
 
-        files = {"description": "description.txt", "comments": "comments.json", "assets": assets}
+        files: dict = {"assets": assets}
+        if desc_file:
+            files["description"] = desc_file
+        if comments_file:
+            files["comments"] = comments_file
         if video_file:
             files["video"] = f"assets/{video_file.name}"
-        if transcript_text:
-            files["transcript"] = "transcript.txt"
+        if transcript_file:
+            files["transcript"] = transcript_file
 
         from datetime import datetime, timedelta, timezone
         refresh_state = {

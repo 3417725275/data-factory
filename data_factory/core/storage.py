@@ -25,6 +25,28 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def maybe_write_text(path: Path, text: str) -> str | None:
+    """Write text file only if *text* has non-whitespace content.
+
+    Returns the filename (``path.name``) on success, ``None`` if skipped.
+    """
+    if not text or not text.strip():
+        return None
+    write_text(path, text)
+    return path.name
+
+
+def maybe_write_json(path: Path, data: list) -> str | None:
+    """Write JSON list file only if *data* is a non-empty list.
+
+    Returns the filename (``path.name``) on success, ``None`` if skipped.
+    """
+    if not data:
+        return None
+    write_json(path, data)
+    return path.name
+
+
 def read_text(path: Path) -> str | None:
     if not path.exists():
         return None

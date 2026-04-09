@@ -10,7 +10,7 @@ import requests
 
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 
 log = logging.getLogger(__name__)
 
@@ -78,10 +78,14 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
         except Exception:
             readme = ""
 
-        write_text(output_dir / "content.md", readme)
-        write_json(output_dir / "comments.json", [])
+        content_file = maybe_write_text(output_dir / "content.md", readme)
 
         item_id = f"{owner}_{repo}"
+
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+
         meta = {
             "id": item_id,
             "platform": "github",
@@ -94,11 +98,11 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
             "author": owner,
             "published_at": data.get("created_at", ""),
             "language": data.get("language", ""),
-            "content_fetched": True,
+            "content_fetched": bool(readme and readme.strip()),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.md", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": None,
             "comment_history": [],
             "platform_meta": {
@@ -124,10 +128,10 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
             return FetchResult("error", "issue", output_dir, False, error=str(e))
 
         content = f"# {data.get('title', '')}\n\n{data.get('body', '')}"
-        write_text(output_dir / "content.md", content)
+        content_file = maybe_write_text(output_dir / "content.md", content)
 
         comments = self.fetch_comments(url)
-        write_json(output_dir / "comments.json", comments)
+        comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
         from datetime import datetime, timedelta, timezone
 
@@ -140,6 +144,13 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
         }
 
         item_id = f"{owner}_{repo}_issue_{issue_num}"
+
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+        if comments_file:
+            files["comments"] = comments_file
+
         meta = {
             "id": item_id,
             "platform": "github",
@@ -152,11 +163,11 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
             "author": data.get("user", {}).get("login", ""),
             "published_at": data.get("created_at", ""),
             "language": "",
-            "content_fetched": True,
+            "content_fetched": bool(content_file),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.md", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [{"timestamp": now_iso(), "count": len(comments)}],
             "platform_meta": {

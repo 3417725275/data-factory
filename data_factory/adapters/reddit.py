@@ -8,7 +8,7 @@ from pathlib import Path
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 
 
 def _extract_post_id(url: str) -> str:
@@ -42,8 +42,8 @@ class RedditAdapter(PlatformAdapter, adapter_name="reddit"):
             post_body = str(raw)
             comments = []
 
-        write_text(output_dir / "content.md", post_body)
-        write_json(output_dir / "comments.json", comments)
+        content_file = maybe_write_text(output_dir / "content.md", post_body)
+        comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
         from datetime import datetime, timedelta, timezone
         refresh_state = {
@@ -63,6 +63,12 @@ class RedditAdapter(PlatformAdapter, adapter_name="reddit"):
             title = raw.get("title", "")
             author = raw.get("author", "")
 
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+        if comments_file:
+            files["comments"] = comments_file
+
         meta = {
             "id": post_id,
             "platform": "reddit",
@@ -75,11 +81,11 @@ class RedditAdapter(PlatformAdapter, adapter_name="reddit"):
             "author": author,
             "published_at": "",
             "language": "en",
-            "content_fetched": True,
+            "content_fetched": bool(post_body and post_body.strip()),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.md", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [{"timestamp": now_iso(), "count": len(comments)}],
             "platform_meta": {

@@ -9,7 +9,7 @@ from pathlib import Path
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
@@ -36,13 +36,13 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
         info = self._get_video_info(bvid)
 
         description = info.get("description", info.get("title", ""))
-        write_text(output_dir / "description.txt", description)
+        desc_file = maybe_write_text(output_dir / "description.txt", description)
 
         try:
             comments = self.fetch_comments(url)
         except Exception:
             comments = []
-        write_json(output_dir / "comments.json", comments)
+        comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
         video_file = download_video(url, assets_dir)
         assets = []
@@ -51,8 +51,7 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
             assets.append(rel)
 
         subtitle_text = self._get_subtitle(bvid)
-        if subtitle_text:
-            write_text(output_dir / "transcript.txt", subtitle_text)
+        transcript_file = maybe_write_text(output_dir / "transcript.txt", subtitle_text)
 
         from datetime import datetime, timedelta, timezone
         refresh_state = {
@@ -63,11 +62,15 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
             "last_comment_count": len(comments),
         }
 
-        files = {"description": "description.txt", "comments": "comments.json", "assets": assets}
+        files: dict = {"assets": assets}
+        if desc_file:
+            files["description"] = desc_file
+        if comments_file:
+            files["comments"] = comments_file
         if video_file:
             files["video"] = f"assets/{video_file.name}"
-        if subtitle_text:
-            files["transcript"] = "transcript.txt"
+        if transcript_file:
+            files["transcript"] = transcript_file
 
         meta = {
             "id": bvid,

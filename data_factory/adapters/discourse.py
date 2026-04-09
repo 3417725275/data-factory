@@ -10,7 +10,7 @@ import requests
 
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.schema import FetchResult
-from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
 
 log = logging.getLogger(__name__)
 
@@ -61,9 +61,9 @@ class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
         comments = posts[1:] if len(posts) > 1 else []
 
         content = first_post.get("cooked", "")
-        write_text(output_dir / "content.html", content)
-        write_json(output_dir / "posts.json", posts)
-        write_json(output_dir / "comments.json", comments)
+        content_file = maybe_write_text(output_dir / "content.html", content)
+        posts_file = maybe_write_json(output_dir / "posts.json", posts)
+        comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
         from datetime import datetime, timedelta, timezone
 
@@ -74,6 +74,14 @@ class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
             "last_refresh_at": now_iso(),
             "last_comment_count": len(comments),
         }
+
+        files: dict = {"assets": []}
+        if content_file:
+            files["content"] = content_file
+        if posts_file:
+            files["posts"] = posts_file
+        if comments_file:
+            files["comments"] = comments_file
 
         meta = {
             "id": topic_id,
@@ -87,11 +95,11 @@ class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
             "author": first_post.get("username", ""),
             "published_at": first_post.get("created_at", ""),
             "language": "",
-            "content_fetched": True,
+            "content_fetched": bool(content and content.strip()),
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"content": "content.html", "posts": "posts.json", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [{"timestamp": now_iso(), "count": len(comments)}],
             "platform_meta": {
