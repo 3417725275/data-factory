@@ -54,8 +54,10 @@
 
 ## Twitter/X
 
-- `opencli twitter` 需要有效的 API 凭证
+- `opencli twitter` 需要 Chrome 已登录 Twitter/X
 - rate_limit 建议 ≥ 2.0，Twitter API 限制较严
+- **图片下载**：`opencli twitter download` 对部分只含图片（无视频）的推文可能返回 "No media found"。代码已内置 Syndication API fallback（`cdn.syndication.twimg.com/tweet-result`），无需认证即可获取 `media_url_https`，自动下载图片/视频
+- **媒体 CDN**：图片托管在 `pbs.twimg.com`，部分网络环境可能需要代理才能访问
 
 ## TikTok
 

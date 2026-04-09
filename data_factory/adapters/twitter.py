@@ -88,6 +88,45 @@ def _extract_media_urls(tweet_data: dict) -> list[str]:
     return [u for u in urls if u and u.startswith("http")]
 
 
+def _fetch_media_via_syndication(tweet_id: str) -> list[str]:
+    """Fetch media URLs from Twitter's public Syndication API (no auth required).
+
+    This is the primary fallback when opencli twitter download returns "No media found".
+    """
+    try:
+        resp = requests.get(
+            f"https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&token=x",
+            timeout=15,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+        )
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+    except Exception as e:
+        log.debug("Syndication API request failed: %s", e)
+        return []
+
+    urls = []
+    for detail in data.get("mediaDetails", []):
+        media_url = detail.get("media_url_https", "")
+        if media_url:
+            if detail.get("type") == "photo":
+                urls.append(f"{media_url}?name=large")
+            elif detail.get("type") == "video":
+                variants = detail.get("video_info", {}).get("variants", [])
+                best = max(
+                    (v for v in variants if v.get("content_type") == "video/mp4"),
+                    key=lambda v: v.get("bitrate", 0),
+                    default=None,
+                )
+                if best:
+                    urls.append(best["url"])
+            else:
+                urls.append(media_url)
+
+    return urls
+
+
 class TwitterAdapter(PlatformAdapter, adapter_name="twitter"):
     URL_PATTERNS = ["twitter.com", "x.com"]
 
@@ -133,6 +172,8 @@ class TwitterAdapter(PlatformAdapter, adapter_name="twitter"):
 
         if not assets:
             media_urls = _extract_media_urls(main_tweet)
+            if not media_urls:
+                media_urls = _fetch_media_via_syndication(tweet_id)
             if media_urls:
                 assets = _download_media_urls(media_urls, assets_dir)
 
