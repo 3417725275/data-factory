@@ -49,6 +49,16 @@ data-factory --config config.yaml fetch --from .fetch_urls.tmp
 
 如果使用方式 2，抓取完成后删除临时文件。
 
+> **⚠️ 关键：URL 必须原样传递，不得截断 query 参数**
+>
+> 搜索返回的 URL 可能包含鉴权参数（如小红书的 `xsec_token`），这些参数对成功抓取至关重要。
+> 将 URL 传给 `fetch` 命令时，**必须保留完整的 query string**，不能只取路径部分。
+>
+> - ❌ `fetch "https://www.xiaohongshu.com/search_result/abc123"` → 返回"安全限制"
+> - ✅ `fetch "https://www.xiaohongshu.com/search_result/abc123?xsec_token=xxx&xsec_source="` → 正常抓取
+>
+> 代码内部会自动进行 URL 规范化（如将 `search_result` 转为 `explore`），但会保留鉴权参数。
+
 在内存中记录本轮抓取的 URL 列表，供关键词发现阶段使用。
 
 **不暂停等待用户确认**，除非用户主动中断。

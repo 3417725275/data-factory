@@ -32,6 +32,7 @@
 - `opencli xiaohongshu` 依赖特定 cookie 或登录态，可能需要定期更新
 - 图片 URL 有防盗链，下载时需要带 referer header
 - **URL 规范化**：搜索结果 URL 含 `/search_result/`，需转为 `/explore/` 格式才能被 `opencli` 正确处理
+- **⚠️ xsec_token 不可丢弃**：搜索返回的 URL 包含 `?xsec_token=xxx&xsec_source=` 等鉴权参数，这些参数是小红书验证请求合法性的必要凭据。如果截断这些参数，`opencli` 将返回"安全限制"（title="安全限制"、content="访问链接异常"），内容、评论、图片全部为空。**传给 fetch 时必须保留完整的 query string**
 - **资源目录展平**：`opencli xiaohongshu download` 会在 `assets/` 下创建以 note_id 命名的子目录，需自动展平到 `assets/` 根目录
 - Windows 上 URL 含 `&` 等特殊字符时需要显式引号包裹（`shell=True` 场景）
 
