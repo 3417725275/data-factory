@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from data_factory.adapters.base import PlatformAdapter
@@ -10,17 +14,9 @@ from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
 from data_factory.core.storage import write_json, write_text, now_iso
 
+log = logging.getLogger(__name__)
 
-def download_file(url: str, dest: Path, **kwargs) -> bool:
-    import requests
-    try:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(resp.content)
-        return True
-    except Exception:
-        return False
+_IS_WINDOWS = sys.platform == "win32"
 
 
 def _extract_bvid(url: str) -> str:
@@ -28,12 +24,28 @@ def _extract_bvid(url: str) -> str:
     return m.group(1) if m else url.rstrip("/").split("/")[-1]
 
 
-def _field_value_to_dict(rows: list[dict]) -> dict[str, str]:
-    out = {}
-    for row in rows:
-        key = row.get("field", "").lower().replace(" ", "_")
-        out[key] = row.get("value", "")
-    return out
+def _download_video_ytdlp(url: str, output_dir: Path) -> Path | None:
+    """Download video using yt-dlp. Returns path or None."""
+    if not shutil.which("yt-dlp"):
+        log.warning("yt-dlp not installed, skipping video download")
+        return None
+    video_path = output_dir / "video.mp4"
+    try:
+        result = subprocess.run(
+            ["yt-dlp", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+             "--merge-output-format", "mp4",
+             "-o", str(video_path), "--no-playlist", "--no-warnings", url],
+            capture_output=True, text=True, timeout=600,
+            encoding="utf-8", errors="replace", shell=_IS_WINDOWS,
+        )
+        if result.returncode == 0 and video_path.exists():
+            log.info("Video downloaded: %s (%.1fMB)", video_path.name, video_path.stat().st_size / 1e6)
+            return video_path
+        actual = list(output_dir.glob("video.*"))
+        return actual[0] if actual else None
+    except Exception as e:
+        log.warning("yt-dlp video download failed: %s", e)
+        return None
 
 
 class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
@@ -49,18 +61,9 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
         assets_dir.mkdir(exist_ok=True)
         bvid = _extract_bvid(url)
 
-        try:
-            raw_info = run_opencli("bilibili", "search", [bvid, "--limit", "1"])
-            if isinstance(raw_info, list) and raw_info and "field" in raw_info[0]:
-                info = _field_value_to_dict(raw_info)
-            elif isinstance(raw_info, list) and raw_info:
-                info = raw_info[0]
-            else:
-                info = {}
-        except Exception as e:
-            return FetchResult("error", "video", output_dir, False, error=str(e))
+        info = self._get_video_info(bvid)
 
-        description = info.get("description", "")
+        description = info.get("description", info.get("title", ""))
         write_text(output_dir / "description.txt", description)
 
         try:
@@ -68,6 +71,16 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
         except Exception:
             comments = []
         write_json(output_dir / "comments.json", comments)
+
+        video_file = _download_video_ytdlp(url, assets_dir)
+        assets = []
+        if video_file:
+            rel = f"assets/{video_file.name}"
+            assets.append(rel)
+
+        subtitle_text = self._get_subtitle(bvid)
+        if subtitle_text:
+            write_text(output_dir / "transcript.txt", subtitle_text)
 
         from datetime import datetime, timedelta, timezone
         refresh_state = {
@@ -78,6 +91,12 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
             "last_comment_count": len(comments),
         }
 
+        files = {"description": "description.txt", "comments": "comments.json", "assets": assets}
+        if video_file:
+            files["video"] = f"assets/{video_file.name}"
+        if subtitle_text:
+            files["transcript"] = "transcript.txt"
+
         meta = {
             "id": bvid,
             "platform": "bilibili",
@@ -85,27 +104,47 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
             "content_type": "video",
             "fetch_method": "opencli",
             "fetched_at": now_iso(),
-            "status": "draft",
+            "status": "complete" if subtitle_text else "draft",
             "title": info.get("title", ""),
-            "author": info.get("author", info.get("up主", "")),
+            "author": info.get("author", ""),
             "published_at": info.get("published", ""),
             "language": "zh",
             "content_fetched": True,
             "content_fetched_at": now_iso(),
-            "transcript_completed": False,
+            "transcript_completed": bool(subtitle_text),
             "images_downloaded": False,
-            "files": {"description": "description.txt", "comments": "comments.json", "assets": []},
+            "files": files,
             "comments_refresh": refresh_state,
             "comment_history": [{"timestamp": now_iso(), "count": len(comments)}],
             "platform_meta": {
                 "bvid": bvid,
-                "views": info.get("views", ""),
-                "likes": info.get("likes", ""),
-                "duration": info.get("duration", ""),
+                "score": info.get("score", ""),
             },
         }
         write_json(output_dir / "meta.json", meta)
-        return FetchResult("ok", "video", output_dir, True)
+        return FetchResult("ok", "video", output_dir, not bool(subtitle_text))
+
+    def _get_video_info(self, bvid: str) -> dict:
+        """Get basic video info via search (bilibili has no dedicated video-info command)."""
+        try:
+            raw = run_opencli("bilibili", "search", [bvid, "--limit", "1"])
+            if isinstance(raw, list) and raw:
+                return raw[0] if isinstance(raw[0], dict) else {}
+            return {}
+        except Exception:
+            return {}
+
+    def _get_subtitle(self, bvid: str) -> str:
+        """Try to get subtitle/transcript via opencli bilibili subtitle."""
+        try:
+            raw = run_opencli("bilibili", "subtitle", [bvid])
+            if isinstance(raw, list):
+                lines = [item.get("content", "") for item in raw if isinstance(item, dict)]
+                return "\n".join(lines)
+            return ""
+        except Exception as e:
+            log.info("No subtitle available for %s: %s", bvid, e)
+            return ""
 
     def fetch_comments(self, url: str) -> list[dict]:
         bvid = _extract_bvid(url)

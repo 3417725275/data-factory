@@ -37,13 +37,17 @@ data-factory --config config.yaml index rebuild --all
 
 ### 2.3 全量抓取
 
-将去重后的新 URL 写入临时文件（如 `.fetch_urls.tmp`），然后执行：
+将去重后的新 URL 直接作为参数传入 `fetch` 命令：
 
 ```bash
+# 方式 1：多 URL 参数（推荐，无需临时文件）
+data-factory --config config.yaml fetch "<url1>" "<url2>" "<url3>" ...
+
+# 方式 2：从文件读取（URL 数量非常大时）
 data-factory --config config.yaml fetch --from .fetch_urls.tmp
 ```
 
-抓取完成后删除临时文件。
+如果使用方式 2，抓取完成后删除临时文件。
 
 在内存中记录本轮抓取的 URL 列表，供关键词发现阶段使用。
 

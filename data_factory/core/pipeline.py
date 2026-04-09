@@ -181,6 +181,8 @@ class Pipeline:
     def _extract_id(self, url: str, platform: str) -> str:
         """Best-effort ID extraction from URL."""
         import re
+        from urllib.parse import urlparse
+
         if platform == "youtube":
             m = re.search(r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]+)", url)
             if m:
@@ -194,13 +196,19 @@ class Pipeline:
             if m:
                 return f"t3_{m.group(1)}"
         if platform in ("xiaohongshu",):
-            m = re.search(r"(?:/explore/|note/)([a-f0-9]+)", url)
+            m = re.search(r"(?:/explore/|/note/|/search_result/)([a-f0-9]+)", url)
             if m:
                 return m.group(1)
         if platform == "zhihu":
             m = re.search(r"question/(\d+)", url)
             if m:
                 return f"q_{m.group(1)}"
+            m = re.search(r"zhuanlan\.zhihu\.com/p/(\d+)", url)
+            if m:
+                return f"p_{m.group(1)}"
+            m = re.search(r"/answer/(\d+)", url)
+            if m:
+                return f"a_{m.group(1)}"
         if platform in ("twitter",):
             m = re.search(r"status/(\d+)", url)
             if m:
@@ -215,5 +223,6 @@ class Pipeline:
                 if m.group(3):
                     return f"{m.group(1)}_{m.group(2)}_issue_{m.group(3)}"
                 return f"{m.group(1)}_{m.group(2)}"
-        parts = url.rstrip("/").split("/")
-        return parts[-1] if parts else url
+        path = urlparse(url).path.rstrip("/")
+        parts = path.split("/")
+        return parts[-1] if parts and parts[-1] else url

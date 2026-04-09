@@ -60,7 +60,8 @@ def test_youtube_fetch_creates_folder(mocker, tmp_path):
         return []
 
     mocker.patch("data_factory.adapters.youtube.run_opencli", side_effect=mock_opencli)
-    mocker.patch("data_factory.adapters.youtube.download_file", return_value=True)
+    mocker.patch("data_factory.adapters.youtube._http_download", return_value=True)
+    mocker.patch("data_factory.adapters.youtube._download_video_ytdlp", return_value=None)
 
     output_dir = tmp_path / "youtube" / "abc123"
     adapter = YouTubeAdapter()

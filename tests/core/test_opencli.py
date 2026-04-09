@@ -12,6 +12,7 @@ def test_run_opencli_returns_parsed_json(mocker):
         {"rank": 2, "title": "Video B", "url": "https://youtube.com/watch?v=bbb"},
     ])
     mocker.patch("subprocess.run", return_value=mock_result)
+    mocker.patch("data_factory.core.opencli._resolve_opencli", return_value="opencli")
 
     result = run_opencli("youtube", "search", ["LLM tutorial", "--limit", "2"])
 
@@ -20,11 +21,12 @@ def test_run_opencli_returns_parsed_json(mocker):
 
     subprocess.run.assert_called_once()
     call_args = subprocess.run.call_args[0][0]
-    assert call_args[0] == "opencli"
-    assert "youtube" in call_args
-    assert "search" in call_args
-    assert "-f" in call_args
-    assert "json" in call_args
+    cmd_str = call_args if isinstance(call_args, str) else " ".join(call_args)
+    assert "opencli" in cmd_str
+    assert "youtube" in cmd_str
+    assert "search" in cmd_str
+    assert "-f" in cmd_str
+    assert "json" in cmd_str
 
 
 def test_run_opencli_raises_on_failure(mocker):
@@ -36,6 +38,7 @@ def test_run_opencli_raises_on_failure(mocker):
     mock_result.stdout = ""
     mock_result.stderr = "Command failed"
     mocker.patch("subprocess.run", return_value=mock_result)
+    mocker.patch("data_factory.core.opencli._resolve_opencli", return_value="opencli")
 
     with pytest.raises(OpencliError, match="Command failed"):
         run_opencli("youtube", "search", ["bad query"])
@@ -48,6 +51,7 @@ def test_run_opencli_handles_table_output_gracefully(mocker):
     mock_result.returncode = 0
     mock_result.stdout = json.dumps({"field": "title", "value": "My Video"})
     mocker.patch("subprocess.run", return_value=mock_result)
+    mocker.patch("data_factory.core.opencli._resolve_opencli", return_value="opencli")
 
     result = run_opencli("youtube", "video", ["https://youtube.com/watch?v=xxx"])
     assert result["field"] == "title"

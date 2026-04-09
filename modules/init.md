@@ -156,10 +156,16 @@ network:
   retry: 3
 ```
 
-询问用户：
-- 是否需要配置代理？（填入 `network.proxy`）
-- 是否有 OpenAI API Key 用于视频转录？（填入 `transcribe.whisper_api`）
-- 是否有 GitHub Token？（填入 `platforms.github.token`）
+**⚠️ 必须逐项询问用户以下配置（不可跳过）：**
+
+1. **网络代理**：是否需要配置代理？如果需要，填入 `network.proxy`（格式：`http://host:port` 或 `socks5://host:port`）
+2. **视频转录（Whisper API）**：是否有 OpenAI API Key 用于视频转录？
+   - 如果有 → 设置 `transcribe.whisper_api.enabled: true` 并填入 `api_key`
+   - 如果没有 → 保持 `enabled: false`，视频转录将仅依赖平台字幕
+   - 提示用户：**启用了 YouTube/Bilibili/TikTok 等视频平台时，建议配置 Whisper API 以获得完整转录**
+3. **GitHub Token**（仅启用了 GitHub 时）：是否有 Personal Access Token？
+
+只有用户明确回答后才生成最终配置。
 
 ### README.md
 

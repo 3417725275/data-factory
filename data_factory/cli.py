@@ -57,28 +57,33 @@ def search(ctx, platform, query, limit, do_fetch):
 
 
 @main.command()
-@click.argument("url", required=False)
+@click.argument("urls", nargs=-1)
 @click.option("--platform", default=None, help="Platform name (auto-detected from URL if omitted)")
 @click.option("--from", "from_file", type=click.Path(exists=True), default=None, help="File with URLs (one per line)")
 @click.option("--force", is_flag=True, default=False, help="Force full re-fetch even if already fetched")
 @click.pass_context
-def fetch(ctx, url, platform, from_file, force):
-    """Fetch content from a URL or file of URLs."""
+def fetch(ctx, urls, platform, from_file, force):
+    """Fetch content from URL(s) or file of URLs.
+
+    Accepts multiple URLs as arguments, --from file, or stdin (pipe).
+    """
     config = _get_config(ctx)
     from data_factory.core.pipeline import Pipeline
     pipeline = Pipeline(config)
 
-    urls = []
+    url_list = list(urls)
     if from_file:
         with open(from_file, encoding="utf-8") as f:
-            urls = [line.strip() for line in f if line.strip()]
-    elif url:
-        urls = [url]
-    else:
-        click.echo("Provide a URL or --from file", err=True)
+            url_list.extend(line.strip() for line in f if line.strip())
+
+    if not url_list and not sys.stdin.isatty():
+        url_list = [line.strip() for line in sys.stdin if line.strip()]
+
+    if not url_list:
+        click.echo("Provide URL(s) as arguments, --from file, or pipe via stdin", err=True)
         sys.exit(1)
 
-    for u in urls:
+    for u in url_list:
         p = platform
         if not p:
             from data_factory.core.router import resolve_adapter
