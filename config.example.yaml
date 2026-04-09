@@ -1,0 +1,59 @@
+output_dir: "./output"
+log_level: "info"
+
+transcribe:
+  whisper_api:
+    enabled: true
+    api_key: ""
+    model: "whisper-1"
+    base_url: "https://api.openai.com/v1"
+  whisper_local:
+    enabled: false
+    model_size: "large-v3"
+    device: "cuda"
+  platform_subtitle:
+    enabled: true
+
+platforms:
+  youtube:
+    enabled: true
+    rate_limit: 2.0
+  bilibili:
+    enabled: true
+    rate_limit: 1.0
+  reddit:
+    enabled: true
+    rate_limit: 2.0
+  xiaohongshu:
+    enabled: true
+    rate_limit: 1.5
+  zhihu:
+    enabled: true
+    rate_limit: 1.5
+  twitter:
+    enabled: true
+    rate_limit: 2.0
+  tiktok:
+    enabled: true
+    rate_limit: 2.0
+  discourse_cn:
+    enabled: true
+    base_url: ""
+    rate_limit: 1.0
+  discourse_en:
+    enabled: true
+    base_url: ""
+    rate_limit: 1.0
+  github:
+    enabled: true
+    token: ""
+    rate_limit: 1.0
+
+scheduler:
+  enabled: false
+  jobs: []
+
+network:
+  proxy: ""
+  timeout: 30
+  retry: 3

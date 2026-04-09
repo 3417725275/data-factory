@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-factory"
+version = "0.1.0"
+description = "Multi-platform data scraping tool with structured JSON output"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "click>=8.1",
+    "apscheduler>=3.10",
+]
+
+[project.optional-dependencies]
+whisper-api = ["openai>=1.0"]
+whisper-local = ["faster-whisper>=1.0"]
+dev = ["pytest>=7.4", "pytest-mock>=3.12"]
+
+[project.scripts]
+data-factory = "data_factory.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
