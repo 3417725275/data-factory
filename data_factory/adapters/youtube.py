@@ -4,19 +4,15 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
 from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
-
-_IS_WINDOWS = sys.platform == "win32"
 
 
 def _http_download(url: str, dest: Path) -> bool:
@@ -29,32 +25,6 @@ def _http_download(url: str, dest: Path) -> bool:
         return True
     except Exception:
         return False
-
-
-def _download_video_ytdlp(video_url: str, output_dir: Path) -> Path | None:
-    """Download video (with audio) using yt-dlp."""
-    if not shutil.which("yt-dlp"):
-        log.warning("yt-dlp not installed, skipping video download")
-        return None
-    video_path = output_dir / "video.mp4"
-    try:
-        result = subprocess.run(
-            ["yt-dlp",
-             "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-             "--merge-output-format", "mp4",
-             "-o", str(video_path),
-             "--no-playlist", "--no-warnings", video_url],
-            capture_output=True, text=True, timeout=600,
-            encoding="utf-8", errors="replace", shell=_IS_WINDOWS,
-        )
-        if result.returncode == 0 and video_path.exists():
-            log.info("Video downloaded: %s (%.1fMB)", video_path.name, video_path.stat().st_size / 1e6)
-            return video_path
-        actual = list(output_dir.glob("video.*"))
-        return actual[0] if actual else None
-    except Exception as e:
-        log.warning("yt-dlp video download failed: %s", e)
-        return None
 
 
 def _extract_video_id(url: str) -> str:
@@ -106,7 +76,7 @@ class YouTubeAdapter(PlatformAdapter, adapter_name="youtube"):
             if _http_download(thumb_url, thumb_path):
                 assets.append("assets/thumbnail.jpg")
 
-        video_file = _download_video_ytdlp(url, assets_dir)
+        video_file = download_video(url, assets_dir)
 
         transcript_text = self._get_transcript(url)
         if transcript_text:

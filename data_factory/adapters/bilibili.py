@@ -4,48 +4,20 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
 from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
-
-_IS_WINDOWS = sys.platform == "win32"
 
 
 def _extract_bvid(url: str) -> str:
     m = re.search(r"(BV[a-zA-Z0-9]+)", url)
     return m.group(1) if m else url.rstrip("/").split("/")[-1]
-
-
-def _download_video_ytdlp(url: str, output_dir: Path) -> Path | None:
-    """Download video using yt-dlp. Returns path or None."""
-    if not shutil.which("yt-dlp"):
-        log.warning("yt-dlp not installed, skipping video download")
-        return None
-    video_path = output_dir / "video.mp4"
-    try:
-        result = subprocess.run(
-            ["yt-dlp", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-             "--merge-output-format", "mp4",
-             "-o", str(video_path), "--no-playlist", "--no-warnings", url],
-            capture_output=True, text=True, timeout=600,
-            encoding="utf-8", errors="replace", shell=_IS_WINDOWS,
-        )
-        if result.returncode == 0 and video_path.exists():
-            log.info("Video downloaded: %s (%.1fMB)", video_path.name, video_path.stat().st_size / 1e6)
-            return video_path
-        actual = list(output_dir.glob("video.*"))
-        return actual[0] if actual else None
-    except Exception as e:
-        log.warning("yt-dlp video download failed: %s", e)
-        return None
 
 
 class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
@@ -72,7 +44,7 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
             comments = []
         write_json(output_dir / "comments.json", comments)
 
-        video_file = _download_video_ytdlp(url, assets_dir)
+        video_file = download_video(url, assets_dir)
         assets = []
         if video_file:
             rel = f"assets/{video_file.name}"

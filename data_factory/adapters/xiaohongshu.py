@@ -162,12 +162,25 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
             except Exception:
                 continue
 
-            files = [f for f in assets_dir.rglob("*")
+            self._flatten_assets(assets_dir)
+            files = [f for f in assets_dir.iterdir()
                      if f.is_file() and f.suffix.lower() in media_exts]
             if files:
-                return [str(f.relative_to(assets_dir.parent)) for f in files]
+                return [f"assets/{f.name}" for f in files]
 
         return []
+
+    @staticmethod
+    def _flatten_assets(assets_dir: Path):
+        """Move files from subdirectories up to assets_dir root, then remove empty subdirs."""
+        import shutil
+        for sub in [d for d in assets_dir.iterdir() if d.is_dir()]:
+            for f in sub.rglob("*"):
+                if f.is_file():
+                    dest = assets_dir / f.name
+                    if not dest.exists():
+                        shutil.move(str(f), str(dest))
+            shutil.rmtree(sub, ignore_errors=True)
 
     def fetch_comments(self, url: str, note_id: str | None = None) -> list[dict]:
         nid = note_id or _extract_note_id(url)

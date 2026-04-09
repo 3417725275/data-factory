@@ -35,8 +35,14 @@ data-factory --config config.yaml search youtube "LLM tutorial" --limit 5
 # 抓取单个 URL
 data-factory --config config.yaml fetch "https://www.youtube.com/watch?v=xxx"
 
+# 抓取多个 URL（空格分隔）
+data-factory --config config.yaml fetch "https://url1" "https://url2" "https://url3"
+
 # 从文件批量抓取（每行一个 URL）
 data-factory --config config.yaml fetch --from urls.txt
+
+# 从 stdin 读取 URL
+echo "https://www.youtube.com/watch?v=xxx" | data-factory --config config.yaml fetch
 
 # 强制重新抓取（忽略已抓取标记）
 data-factory --config config.yaml fetch --force "https://www.youtube.com/watch?v=xxx"
@@ -79,13 +85,13 @@ data-factory --config config.yaml schedule list
 
 | 平台 | 搜索 | 抓取 | 评论 | 媒体 | 抓取工具 |
 |------|------|------|------|------|----------|
-| YouTube | ✅ | ✅ | ✅ | ✅ 缩略图 | opencli |
-| Bilibili | ✅ | ✅ | ✅ | ✅ 封面 | opencli |
+| YouTube | ✅ | ✅ | ✅ | ✅ 缩略图+视频+字幕 | opencli + yt-dlp |
+| Bilibili | ✅ | ✅ | ✅ | ✅ 视频+字幕 | opencli + yt-dlp |
 | Reddit | ✅ | ✅ | ✅ | — | opencli |
-| 小红书 | ✅ | ✅ | ✅ | ✅ | opencli |
-| 知乎 | ✅ | ✅ | ⚠️ 待实现 | — | opencli |
+| 小红书 | ✅ | ✅ | ✅ | ✅ 图片/视频 | opencli |
+| 知乎 | ✅ | ✅ (问答+文章) | ⚠️ 待实现 | ✅ 文章附件 | opencli + CDP |
 | Twitter/X | ✅ | ✅ | ✅ | ✅ | opencli |
-| TikTok | ✅ | ✅ | ⚠️ 待实现 | ✅ yt-dlp | opencli |
+| TikTok | ✅ | ✅ | ⚠️ 待实现 | ✅ 视频 | opencli + yt-dlp |
 | Discourse | ✅ | ✅ | ✅ | — | REST API |
 | GitHub | ✅ | ✅ | ✅ | — | REST API |
 
@@ -95,15 +101,17 @@ data-factory --config config.yaml schedule list
 抓取 (Fetch) → 处理 (Process) → 索引 (Index)
 
 PlatformAdapter (抽象基类)
-  ├── YouTubeAdapter      (opencli)
-  ├── BilibiliAdapter     (opencli)
+  ├── YouTubeAdapter      (opencli + yt-dlp)
+  ├── BilibiliAdapter     (opencli + yt-dlp)
   ├── RedditAdapter       (opencli)
   ├── XiaohongshuAdapter  (opencli)
-  ├── ZhihuAdapter        (opencli)
+  ├── ZhihuAdapter        (opencli + CDP 标题提取)
   ├── TwitterAdapter      (opencli)
   ├── TikTokAdapter       (opencli + yt-dlp)
   ├── DiscourseAdapter    (requests, 支持多实例: discourse_cn / discourse_en)
   └── GitHubAdapter       (requests)
+
+core.video   — 统一的 yt-dlp 视频下载（自动检测 ffmpeg，无则降级为预合并格式）
 
 Processor (抽象基类)
   ├── TranscribeProcessor (Whisper API → 本地 Whisper → 平台字幕)
@@ -126,21 +134,45 @@ output/
 │       ├── meta.json               # 元数据（含评论刷新状态）
 │       ├── description.txt         # 视频描述
 │       ├── comments.json           # 评论数据
-│       ├── transcript.json         # 转录结果（处理后生成）
+│       ├── transcript.txt          # 字幕/转录文本
 │       └── assets/
-│           └── thumbnail.jpg       # 缩略图
+│           ├── thumbnail.jpg       # 缩略图
+│           └── video.mp4           # 视频（yt-dlp + ffmpeg 合并）
+├── bilibili/
+│   ├── index.json
+│   └── <BVid>/
+│       ├── meta.json
+│       ├── description.txt
+│       ├── comments.json
+│       ├── transcript.txt          # 字幕
+│       └── assets/
+│           └── video.mp4           # 视频
 ├── reddit/
 │   ├── index.json
 │   └── <post_id>/
 │       ├── meta.json
 │       ├── content.md              # 帖子正文（Markdown）
 │       └── comments.json
+├── xiaohongshu/
+│   ├── index.json
+│   └── <note_id>/
+│       ├── meta.json
+│       ├── content.txt             # 笔记正文
+│       ├── comments.json
+│       └── assets/                 # 图片/视频（自动展平子目录）
 ├── zhihu/
 │   ├── index.json
-│   └── q_<question_id>/
+│   ├── .search_cache.json          # 搜索标题缓存（URL→标题映射）
+│   ├── q_<question_id>/            # 问答类型
+│   │   ├── meta.json
+│   │   ├── content.md              # 问题标题 + 所有回答
+│   │   ├── answers.json            # 回答列表（结构化）
+│   │   └── comments.json
+│   └── <article_id>/               # 文章类型
 │       ├── meta.json
-│       ├── content.md              # 回答正文
-│       └── comments.json
+│       ├── content.md              # 文章正文（自动清理 UI 噪音）
+│       ├── comments.json
+│       └── assets/                 # 文章附件（自动展平子目录）
 └── global_index.json               # 全局汇总索引
 ```
 
@@ -274,11 +306,25 @@ network:
 - **Python 3.11+**
 - **[opencli](https://github.com/nicepkg/opencli)**：大部分平台的搜索和抓取依赖此工具
   ```bash
-  npm install -g opencli
+  npm install -g @jackwener/opencli
+  opencli doctor          # 激活浏览器桥接
   ```
-- **yt-dlp**（可选）：用于 TikTok 视频下载和音频提取
+- **yt-dlp**：YouTube / Bilibili / TikTok 视频下载
   ```bash
   pip install yt-dlp
+  ```
+- **ffmpeg**：视频音轨合并（yt-dlp 下载的视频流和音频流需要 ffmpeg 合并为单个 mp4；缺少时自动降级为预合并格式，画质较低）
+  ```bash
+  # Windows
+  winget install Gyan.FFmpeg
+  # macOS
+  brew install ffmpeg
+  # Linux
+  sudo apt install ffmpeg
+  ```
+- **playwright**（可选）：知乎问答标题提取（通过 CDP 连接 opencli 的 Chrome 实例读取 DOM）
+  ```bash
+  pip install playwright
   ```
 
 ## 开发

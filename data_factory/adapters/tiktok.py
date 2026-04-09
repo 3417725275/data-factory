@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from pathlib import Path
 
 from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
 from data_factory.core.storage import write_json, write_text, now_iso
+from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
 
@@ -52,15 +52,7 @@ class TikTokAdapter(PlatformAdapter, adapter_name="tiktok"):
         log.warning("TikTok comments not available via opencli for %s", url)
         write_json(output_dir / "comments.json", comments)
 
-        try:
-            video_path = assets_dir / "video.mp4"
-            subprocess.run(
-                ["yt-dlp", "-o", str(video_path), url],
-                capture_output=True,
-                timeout=300,
-            )
-        except Exception as e:
-            log.warning("yt-dlp download failed: %s", e)
+        video_file = download_video(url, assets_dir)
 
         from datetime import datetime, timedelta, timezone
 
@@ -88,7 +80,12 @@ class TikTokAdapter(PlatformAdapter, adapter_name="tiktok"):
             "content_fetched_at": now_iso(),
             "transcript_completed": False,
             "images_downloaded": False,
-            "files": {"description": "description.txt", "comments": "comments.json", "assets": []},
+            "files": {
+                "description": "description.txt",
+                "comments": "comments.json",
+                "assets": [f"assets/{video_file.name}"] if video_file else [],
+                **({"video": f"assets/{video_file.name}"} if video_file else {}),
+            },
             "comments_refresh": refresh_state,
             "comment_history": [],
             "platform_meta": {
