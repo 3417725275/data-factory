@@ -16,9 +16,9 @@ def test_github_search(mocker):
 
     mock_resp = mocker.MagicMock()
     mock_resp.json.return_value = {"items": [{"html_url": "https://github.com/owner/repo"}]}
-    mocker.patch("data_factory.adapters.github_adapter.requests.get", return_value=mock_resp)
 
     adapter = GitHubAdapter()
+    mocker.patch.object(adapter.session, "get", return_value=mock_resp)
     urls = adapter.search("python web framework", limit=5)
     assert len(urls) == 1
 
@@ -47,10 +47,9 @@ def test_github_fetch_repo(mocker, tmp_path):
             resp.json.return_value = repo_data
         return resp
 
-    mocker.patch("data_factory.adapters.github_adapter.requests.get", side_effect=mock_get)
-
     output_dir = tmp_path / "github" / "owner_repo"
     adapter = GitHubAdapter()
+    mocker.patch.object(adapter.session, "get", side_effect=mock_get)
     result = adapter.fetch("https://github.com/owner/repo", output_dir)
 
     assert result.status == "ok"
@@ -83,10 +82,9 @@ def test_github_fetch_issue(mocker, tmp_path):
             resp.json.return_value = issue_data
         return resp
 
-    mocker.patch("data_factory.adapters.github_adapter.requests.get", side_effect=mock_get)
-
     output_dir = tmp_path / "github" / "owner_repo_issue_42"
     adapter = GitHubAdapter()
+    mocker.patch.object(adapter.session, "get", side_effect=mock_get)
     result = adapter.fetch("https://github.com/owner/repo/issues/42", output_dir)
 
     assert result.status == "ok"

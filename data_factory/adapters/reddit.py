@@ -28,7 +28,7 @@ class RedditAdapter(PlatformAdapter, adapter_name="reddit"):
         post_id = _extract_post_id(url)
 
         try:
-            raw = run_opencli("reddit", "read", [url, "--depth", "3", "--replies", "10"])
+            raw = run_opencli("reddit", "read", [url])
         except Exception as e:
             return FetchResult("error", "post", output_dir, False, error=str(e))
 
@@ -92,7 +92,7 @@ class RedditAdapter(PlatformAdapter, adapter_name="reddit"):
         return FetchResult("ok", "post", output_dir, False)
 
     def fetch_comments(self, url: str) -> list[dict]:
-        raw = run_opencli("reddit", "read", [url, "--depth", "3", "--replies", "10"])
+        raw = run_opencli("reddit", "read", [url])
         if isinstance(raw, list) and len(raw) > 1:
             return raw[1:]
         if isinstance(raw, dict):

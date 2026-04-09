@@ -15,9 +15,9 @@ def test_discourse_search(mocker):
 
     mock_resp = mocker.MagicMock()
     mock_resp.json.return_value = {"topics": [{"slug": "my-topic", "id": 123}]}
-    mocker.patch("data_factory.adapters.discourse.requests.get", return_value=mock_resp)
 
     adapter = DiscourseAdapter(base_url="https://forum.example.com")
+    mocker.patch.object(adapter.session, "get", return_value=mock_resp)
     urls = adapter.search("test query", limit=5)
     assert len(urls) == 1
     assert "123" in urls[0]
@@ -42,10 +42,10 @@ def test_discourse_fetch(mocker, tmp_path):
     }
     mock_resp = mocker.MagicMock()
     mock_resp.json.return_value = topic_data
-    mocker.patch("data_factory.adapters.discourse.requests.get", return_value=mock_resp)
 
     output_dir = tmp_path / "discourse" / "123"
     adapter = DiscourseAdapter(base_url="https://forum.example.com")
+    mocker.patch.object(adapter.session, "get", return_value=mock_resp)
     result = adapter.fetch("https://forum.example.com/t/my-topic/123", output_dir)
 
     assert result.status == "ok"

@@ -126,4 +126,4 @@ class YouTubeAdapter(PlatformAdapter, adapter_name="youtube"):
         )
 
     def fetch_comments(self, url: str) -> list[dict]:
-        return run_opencli("youtube", "comments", [url, "--limit", "100"])
+        return run_opencli("youtube", "comments", [url])

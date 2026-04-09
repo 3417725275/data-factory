@@ -109,4 +109,4 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
 
     def fetch_comments(self, url: str) -> list[dict]:
         bvid = _extract_bvid(url)
-        return run_opencli("bilibili", "comments", [bvid, "--limit", "50"])
+        return run_opencli("bilibili", "comments", [bvid])

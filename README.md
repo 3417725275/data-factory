@@ -130,3 +130,5 @@ Environment variable overrides:
 pip install -e ".[dev]"
 pytest -v
 ```
+
+> **Note:** Tests require the `[dev]` extras (`pytest` and `pytest-mock`). Running `pytest` without `pip install -e ".[dev]"` will result in fixture errors.

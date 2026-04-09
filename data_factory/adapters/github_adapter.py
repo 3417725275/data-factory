@@ -27,17 +27,20 @@ def _parse_github_url(url: str) -> dict:
 class GitHubAdapter(PlatformAdapter, adapter_name="github"):
     URL_PATTERNS = ["github.com"]
 
-    def __init__(self, token: str | None = None):
+    def __init__(self, token: str | None = None, proxy: str = ""):
         self.token = token
         self.headers = {}
         if token:
             self.headers["Authorization"] = f"token {token}"
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
 
     def search(self, query: str, limit: int = 20) -> list[str]:
-        resp = requests.get(
+        resp = self.session.get(
             f"{API_BASE}/search/repositories",
             params={"q": query, "per_page": min(limit, 30)},
-            headers=self.headers,
             timeout=30,
         )
         resp.raise_for_status()
@@ -59,16 +62,16 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
 
     def _fetch_repo(self, owner: str, repo: str, url: str, output_dir: Path) -> FetchResult:
         try:
-            resp = requests.get(f"{API_BASE}/repos/{owner}/{repo}", headers=self.headers, timeout=30)
+            resp = self.session.get(f"{API_BASE}/repos/{owner}/{repo}", timeout=30)
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
             return FetchResult("error", "repo", output_dir, False, error=str(e))
 
         try:
-            readme_resp = requests.get(
+            readme_resp = self.session.get(
                 f"{API_BASE}/repos/{owner}/{repo}/readme",
-                headers={**self.headers, "Accept": "application/vnd.github.raw"},
+                headers={"Accept": "application/vnd.github.raw"},
                 timeout=30,
             )
             readme = readme_resp.text if readme_resp.status_code == 200 else ""
@@ -111,9 +114,8 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
 
     def _fetch_issue(self, owner: str, repo: str, issue_num: str, url: str, output_dir: Path) -> FetchResult:
         try:
-            resp = requests.get(
+            resp = self.session.get(
                 f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}",
-                headers=self.headers,
                 timeout=30,
             )
             resp.raise_for_status()
@@ -175,10 +177,9 @@ class GitHubAdapter(PlatformAdapter, adapter_name="github"):
         all_comments = []
         page = 1
         while True:
-            resp = requests.get(
+            resp = self.session.get(
                 f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_num}/comments",
                 params={"per_page": 100, "page": page},
-                headers=self.headers,
                 timeout=30,
             )
             resp.raise_for_status()

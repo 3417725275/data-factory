@@ -19,6 +19,7 @@ def run_opencli(
     args: list[str] | None = None,
     format: str = "json",
     timeout: int = 120,
+    proxy: str = "",
 ) -> dict | list:
     cmd = ["opencli", platform, command]
     if args:
@@ -27,11 +28,17 @@ def run_opencli(
 
     log.debug("Running: %s", " ".join(cmd))
 
+    env = None
+    if proxy:
+        import os
+        env = {**os.environ, "HTTP_PROXY": proxy, "HTTPS_PROXY": proxy}
+
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=env,
     )
 
     if result.returncode != 0:

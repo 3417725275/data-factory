@@ -26,9 +26,12 @@ def _extract_topic_id(url: str) -> str:
 class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
     URL_PATTERNS = []
 
-    def __init__(self, base_url: str = "", platform_key: str = "discourse"):
+    def __init__(self, base_url: str = "", platform_key: str = "discourse", proxy: str = ""):
         self.base_url = base_url.rstrip("/")
         self.platform_key = platform_key
+        self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
 
     def can_fetch(self, url: str) -> bool:
         if self.base_url and self.base_url in url:
@@ -36,7 +39,7 @@ class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
         return False
 
     def search(self, query: str, limit: int = 20) -> list[str]:
-        resp = requests.get(f"{self.base_url}/search.json", params={"q": query}, timeout=30)
+        resp = self.session.get(f"{self.base_url}/search.json", params={"q": query}, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         topics = data.get("topics", [])[:limit]
@@ -47,7 +50,7 @@ class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
         topic_id = _extract_topic_id(url)
 
         try:
-            resp = requests.get(f"{self.base_url}/t/{topic_id}.json", timeout=30)
+            resp = self.session.get(f"{self.base_url}/t/{topic_id}.json", timeout=30)
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
@@ -103,7 +106,7 @@ class DiscourseAdapter(PlatformAdapter, adapter_name="discourse"):
 
     def fetch_comments(self, url: str) -> list[dict]:
         topic_id = _extract_topic_id(url)
-        resp = requests.get(f"{self.base_url}/t/{topic_id}.json", timeout=30)
+        resp = self.session.get(f"{self.base_url}/t/{topic_id}.json", timeout=30)
         resp.raise_for_status()
         data = resp.json()
         posts = data.get("post_stream", {}).get("posts", [])

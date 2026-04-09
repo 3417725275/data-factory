@@ -103,8 +103,20 @@ class Indexer:
         write_json(global_path, gi)
 
     def _list_platforms(self) -> list[str]:
-        return [
-            d.name
-            for d in self.output_dir.iterdir()
-            if d.is_dir() and (d / "index.json").exists()
-        ]
+        """Discover platforms by scanning for directories containing item subdirs with meta.json."""
+        if not self.output_dir.exists():
+            return []
+        platforms = []
+        for d in self.output_dir.iterdir():
+            if not d.is_dir():
+                continue
+            if d.name == ".git":
+                continue
+            has_items = any(
+                (sub / "meta.json").exists()
+                for sub in d.iterdir()
+                if sub.is_dir()
+            )
+            if has_items or (d / "index.json").exists():
+                platforms.append(d.name)
+        return platforms

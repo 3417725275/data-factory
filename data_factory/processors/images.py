@@ -65,5 +65,6 @@ class ImageDownloadProcessor(Processor, processor_name="images"):
             if download_file(url, local_path, timeout=timeout):
                 downloaded.append(str(local_path.relative_to(output_dir)))
 
-        update_meta(output_dir, {"images_downloaded": True})
-        log.info("Downloaded %d images for %s", len(downloaded), output_dir.name)
+        if not urls or downloaded:
+            update_meta(output_dir, {"images_downloaded": True})
+        log.info("Downloaded %d/%d images for %s", len(downloaded), len(urls), output_dir.name)

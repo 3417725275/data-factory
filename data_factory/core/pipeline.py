@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from data_factory.adapters.base import ADAPTER_REGISTRY, PlatformAdapter
@@ -14,11 +15,42 @@ from data_factory.core.storage import load_json, load_meta, update_meta, write_j
 
 log = logging.getLogger(__name__)
 
+_DISCOURSE_ALIASES = {
+    "discourse_cn", "discourse_en", "discourse_zh", "discourse_intl",
+}
+
 
 def get_adapter(platform: str, config: AppConfig) -> PlatformAdapter:
+    """Instantiate a platform adapter, injecting config where needed."""
+    pcfg = config.platforms.get(platform)
+
     cls = ADAPTER_REGISTRY.get(platform)
+
+    if cls is None and platform in _DISCOURSE_ALIASES or (cls is None and platform.startswith("discourse")):
+        cls = ADAPTER_REGISTRY.get("discourse")
+
     if cls is None:
         raise ValueError(f"Unknown platform: {platform}")
+
+    if platform.startswith("discourse") and platform != "discourse":
+        base_url = pcfg.base_url if pcfg else ""
+        return cls(base_url=base_url or "", platform_key=platform)
+
+    if hasattr(cls, "__init__"):
+        import inspect
+        sig = inspect.signature(cls.__init__)
+        params = set(sig.parameters.keys()) - {"self"}
+
+        kwargs = {}
+        if "base_url" in params and pcfg:
+            kwargs["base_url"] = pcfg.base_url or ""
+        if "platform_key" in params:
+            kwargs["platform_key"] = platform
+        if "token" in params and pcfg:
+            kwargs["token"] = pcfg.token
+        if kwargs:
+            return cls(**kwargs)
+
     return cls()
 
 
@@ -30,27 +62,49 @@ class Pipeline:
     def resolve_output_dir(self, platform: str, item_id: str) -> Path:
         return self.config.output_dir / platform / item_id
 
-    def run_full(self, url: str, platform: str) -> FetchResult | None:
+    def _rate_limit(self, platform: str) -> None:
+        pcfg = self.config.platforms.get(platform)
+        if pcfg and pcfg.rate_limit > 0:
+            time.sleep(pcfg.rate_limit)
+
+    def run_full(self, url: str, platform: str, force: bool = False) -> FetchResult | None:
         adapter = get_adapter(platform, self.config)
         item_id = self._extract_id(url, platform)
         output_dir = self.resolve_output_dir(platform, item_id)
 
         meta = load_meta(output_dir)
-        if meta and meta.get("content_fetched"):
+        if meta and meta.get("content_fetched") and not force:
             log.info("Content already fetched, checking comments: %s", url)
             self.run_refresh(url, platform)
             return None
 
+        self._rate_limit(platform)
         result = adapter.fetch(url, output_dir)
         if result.status == "error":
             log.error("Fetch failed for %s: %s", url, result.error)
             return result
+
+        self._run_processors(result, output_dir)
 
         meta = load_meta(output_dir)
         if meta:
             self.indexer.upsert_item(platform, meta.get("id", item_id), meta)
 
         return result
+
+    def _run_processors(self, result: FetchResult, output_dir: Path) -> None:
+        """Auto-run applicable processors after fetch."""
+        import data_factory.processors  # noqa: F401
+        from data_factory.processors.base import PROCESSOR_REGISTRY
+
+        for name, proc_cls in PROCESSOR_REGISTRY.items():
+            proc = proc_cls()
+            try:
+                if proc.should_run(result, output_dir):
+                    log.info("Running processor: %s on %s", name, output_dir.name)
+                    proc.process(result, output_dir, self.config)
+            except Exception as e:
+                log.error("Processor %s failed for %s: %s", name, output_dir.name, e)
 
     def run_refresh(self, url: str, platform: str) -> None:
         adapter = get_adapter(platform, self.config)
@@ -66,6 +120,7 @@ class Pipeline:
             log.info("Comment refresh not due for %s", url)
             return
 
+        self._rate_limit(platform)
         try:
             comments = adapter.fetch_comments(url)
         except Exception as e:
@@ -112,7 +167,7 @@ class Pipeline:
             needs_transcribe=(content_type == "video"),
         )
 
-        import data_factory.processors  # noqa: F401 — register Processor subclasses
+        import data_factory.processors  # noqa: F401
         from data_factory.processors.base import PROCESSOR_REGISTRY
         proc_cls = PROCESSOR_REGISTRY.get(step)
         if proc_cls is None:
@@ -124,10 +179,41 @@ class Pipeline:
             proc.process(result, output_dir, self.config)
 
     def _extract_id(self, url: str, platform: str) -> str:
+        """Best-effort ID extraction from URL."""
         import re
         if platform == "youtube":
             m = re.search(r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]+)", url)
             if m:
                 return m.group(1)
+        if platform == "bilibili":
+            m = re.search(r"(BV[a-zA-Z0-9]+)", url)
+            if m:
+                return m.group(1)
+        if platform == "reddit":
+            m = re.search(r"/comments/([a-z0-9]+)", url)
+            if m:
+                return f"t3_{m.group(1)}"
+        if platform in ("xiaohongshu",):
+            m = re.search(r"(?:/explore/|note/)([a-f0-9]+)", url)
+            if m:
+                return m.group(1)
+        if platform == "zhihu":
+            m = re.search(r"question/(\d+)", url)
+            if m:
+                return f"q_{m.group(1)}"
+        if platform in ("twitter",):
+            m = re.search(r"status/(\d+)", url)
+            if m:
+                return m.group(1)
+        if platform == "tiktok":
+            m = re.search(r"video/(\d+)", url)
+            if m:
+                return m.group(1)
+        if platform == "github":
+            m = re.match(r"https?://github\.com/([^/]+)/([^/]+)(?:/issues/(\d+))?", url)
+            if m:
+                if m.group(3):
+                    return f"{m.group(1)}_{m.group(2)}_issue_{m.group(3)}"
+                return f"{m.group(1)}_{m.group(2)}"
         parts = url.rstrip("/").split("/")
         return parts[-1] if parts else url

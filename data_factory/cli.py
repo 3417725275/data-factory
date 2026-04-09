@@ -60,7 +60,7 @@ def search(ctx, platform, query, limit, do_fetch):
 @click.argument("url", required=False)
 @click.option("--platform", default=None, help="Platform name (auto-detected from URL if omitted)")
 @click.option("--from", "from_file", type=click.Path(exists=True), default=None, help="File with URLs (one per line)")
-@click.option("--force", is_flag=True, default=False, help="Force full re-fetch")
+@click.option("--force", is_flag=True, default=False, help="Force full re-fetch even if already fetched")
 @click.pass_context
 def fetch(ctx, url, platform, from_file, force):
     """Fetch content from a URL or file of URLs."""
@@ -86,11 +86,11 @@ def fetch(ctx, url, platform, from_file, force):
             p = adapter.adapter_name
 
         click.echo(f"[{p}] Fetching: {u}")
-        result = pipeline.run_full(u, p)
+        result = pipeline.run_full(u, p, force=force)
         if result and result.status == "error":
             click.echo(f"  ERROR: {result.error}", err=True)
         else:
-            click.echo(f"  Done.")
+            click.echo("  Done.")
 
 
 @main.command()
@@ -112,12 +112,18 @@ def refresh(ctx, platform, item_id, force):
             pipeline.run_refresh(meta["url"], platform)
         return
 
+    if not config.output_dir.exists():
+        click.echo("No output directory found.", err=True)
+        return
+
     for platform_dir in config.output_dir.iterdir():
         if not platform_dir.is_dir():
             continue
         if platform and platform_dir.name != platform:
             continue
         for item_dir in platform_dir.iterdir():
+            if not item_dir.is_dir():
+                continue
             meta_path = item_dir / "meta.json"
             meta = load_json(meta_path)
             if not meta:
@@ -152,15 +158,54 @@ def process(ctx, step, platform, item_id):
             pipeline.run_step(step, platform, item_dir.name)
 
 
+@main.command()
+@click.option("--platform", default=None)
+@click.option("--id", "item_id", default=None)
+@click.pass_context
+def status(ctx, platform, item_id):
+    """Show overview status of fetched data."""
+    config = _get_config(ctx)
+
+    if item_id and platform:
+        meta = load_json(config.output_dir / platform / item_id / "meta.json")
+        if not meta:
+            click.echo(f"No data found for {platform}/{item_id}", err=True)
+            return
+        click.echo(f"Platform:  {meta.get('platform', '')}")
+        click.echo(f"Title:     {meta.get('title', '')}")
+        click.echo(f"URL:       {meta.get('url', '')}")
+        click.echo(f"Status:    {meta.get('status', '')}")
+        click.echo(f"Fetched:   {meta.get('fetched_at', '')}")
+        click.echo(f"Type:      {meta.get('content_type', '')}")
+        cr = meta.get("comments_refresh", {})
+        if cr:
+            click.echo(f"Comments:  {cr.get('last_comment_count', 0)} (next refresh: {cr.get('next_refresh_at', 'N/A')})")
+        return
+
+    gi = load_json(config.output_dir / "global_index.json")
+    if not gi:
+        click.echo("No index found. Run 'data-factory index rebuild --all' first.")
+        return
+
+    click.echo(f"Total: {gi.get('total_count', 0)} items")
+    click.echo(f"Updated: {gi.get('updated_at', 'never')}")
+    click.echo()
+
+    for pname, pinfo in gi.get("platforms", {}).items():
+        if platform and pname != platform:
+            continue
+        click.echo(f"  {pname}: {pinfo['count']} items (updated {pinfo['last_updated']})")
+
+
 @main.group(name="index")
 def index_group():
     """Index management commands."""
 
 
-@index_group.command()
+@index_group.command(name="status")
 @click.option("--platform", default=None)
 @click.pass_context
-def status(ctx, platform):
+def index_status(ctx, platform):
     """Show index status."""
     config = _get_config(ctx)
     gi = load_json(config.output_dir / "global_index.json")
@@ -231,17 +276,16 @@ def schedule():
 
 
 @schedule.command()
-@click.option("--foreground", is_flag=True, default=False)
 @click.pass_context
-def start(ctx, foreground):
-    """Start the scheduler."""
+def start(ctx):
+    """Start the scheduler (blocks until Ctrl+C)."""
     config = _get_config(ctx)
     from data_factory.core.pipeline import Pipeline
     from data_factory.core.scheduler import DataFactoryScheduler
 
     pipeline = Pipeline(config)
     sched = DataFactoryScheduler(config, pipeline)
-    click.echo("Starting scheduler...")
+    click.echo("Starting scheduler... (Ctrl+C to stop)")
     sched.start()
 
 
@@ -252,13 +296,6 @@ def list_jobs(ctx):
     config = _get_config(ctx)
     for job in config.scheduler.jobs:
         click.echo(f"  {job.name}: {job.platform} search '{job.query}' cron={job.cron}")
-
-
-@schedule.command()
-@click.pass_context
-def stop(ctx):
-    """Stop the scheduler (sends signal)."""
-    click.echo("Send Ctrl+C to the running scheduler process to stop it.")
 
 
 if __name__ == "__main__":
