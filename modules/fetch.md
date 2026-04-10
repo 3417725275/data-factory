@@ -75,17 +75,21 @@ data-factory --config config.yaml fetch --from .fetch_urls.tmp
 
 ## Step 3：错误处理
 
-监控抓取命令输出中的 `ERROR` 行。对于失败的 URL：
+监控每条 `fetch` 命令的输出和退出码。对于失败的 URL：
 
-1. **记录经验**：按 `knowledge/experiences_template.md` 格式追加到 `experiences.md`
-2. **检索方案**：
-   - 搜索 `experiences.md` 中是否有同平台 + 同类错误的记录
-   - 搜索 `knowledge/platform_quirks.md` 中是否有相关说明
-3. **自动重试**（如果有可应用的方案）：
-   - 超时类错误 → 建议用户调大 rate_limit，重试
-   - 网络类错误 → 检查代理设置，重试
-   - 其他错误 → 跳过，在汇总中标记
-4. **跳过**（如果无方案）：记录到最终汇总中
+1. **暂存失败记录**：将失败 URL + 平台 + 原因暂存在内存中，**不中断流程**，继续处理剩余 URL
+2. **提取失败原因**：从 CLI 输出的 `ERROR`/`WARNING` 行中提取关键信息，结合 `knowledge/platform_quirks.md` 的已知问题做解释（如"yt-dlp: 年龄限制"、"xsec_token 缺失"等）
+3. **记录经验**：按 `knowledge/experiences_template.md` 格式追加到 `experiences.md`
+4. **检索方案**：
+  - 搜索 `experiences.md` 中是否有同平台 + 同类错误的记录
+  - 搜索 `knowledge/platform_quirks.md` 中是否有相关说明
+5. **自动重试**（如果有可应用的方案）：
+  - 超时类错误 → 建议用户调大 rate_limit，重试
+  - 网络类错误 → 检查代理设置，重试
+  - 其他错误 → 跳过，在汇总中标记
+6. **跳过**（如果无方案）：保留在失败清单中，统一在 Step 5 汇总
+
+> **⚠️ 关键**：所有 URL 处理完毕后统一进入 Step 5 汇总。不要因为某条 URL 失败就中断整个流程。
 
 ## Step 4：刷新评论
 
@@ -97,28 +101,47 @@ data-factory --config config.yaml refresh
 
 ## Step 5：抓取后汇总
 
-输出汇总报告：
+> **⚠️ 每轮抓取结束后必须输出此汇总报告，即使全部成功也不可省略。**
+
+输出汇总报告（**强制格式**）：
 
 ```
-本轮抓取完成：
+## 本轮抓取汇总
 
-📊 搜索结果
+### 搜索
 - 搜索关键词: <N> 个 × <M> 个平台
 - 发现 URL: <total> 条（去重后新增 <new> 条）
 
-📥 抓取结果
-- 成功: <N> 条（YouTube <n1>, Reddit <n2>, ...）
-- 失败: <N> 条（原因汇总）
-- 已存在: <N> 条（跳过全量抓取，自动刷新评论）
+### 统计
+- 总计: X 条 URL
+- 成功: Y 条
+- 跳过(已存在): Z 条
+- 失败: N 条
 
-💬 评论刷新
+### 失败清单
+> 如果本轮无失败，写"无"。如果有失败，**必须逐条列出，禁止省略或笼统描述**。
+
+| 平台 | URL | 失败原因 | 可否重试 |
+|------|-----|---------|---------|
+| youtube | https://... | yt-dlp: 年龄限制，需登录 | 是(配置cookies后) |
+| xiaohongshu | https://... | 安全限制(xsec_token缺失) | 是(使用完整URL) |
+
+### 评论刷新
 - 已刷新: <N> 条
 - 未到期: <N> 条
 
-🔄 后处理
+### 后处理
 - 转录完成: <N> 条
 - 图片下载: <N> 条
+
+### 经验沉淀
+- 若某平台连续失败 ≥ 3 条且原因相同，总结规律，建议写入 experiences.md
 ```
+
+**约束**：
+
+- 失败清单中的"失败原因"从 CLI 输出的 ERROR/WARNING 行中提取，结合 `knowledge/platform_quirks.md` 的已知问题做人类可读的解释
+- "可否重试"需给出具体操作建议（如"配置 cookies"、"使用完整 URL"、"无法重试"等）
 
 ### 后续自动操作
 

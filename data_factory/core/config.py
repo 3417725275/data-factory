@@ -68,6 +68,11 @@ class NetworkConfig:
 
 
 @dataclass
+class VideoConfig:
+    quality: str  # best, 1080p, 720p, 480p
+
+
+@dataclass
 class AppConfig:
     output_dir: Path
     log_level: str
@@ -75,6 +80,7 @@ class AppConfig:
     platforms: dict[str, PlatformConfig]
     scheduler: SchedulerConfig
     network: NetworkConfig
+    video: VideoConfig
 
 
 def _parse_platform(name: str, raw: dict) -> PlatformConfig:
@@ -163,6 +169,9 @@ def load_config(path: Path | None = None) -> AppConfig:
         retry=int(net.get("retry", 3)),
     )
 
+    vid = raw.get("video", {})
+    video = VideoConfig(quality=vid.get("quality", "720p"))
+
     config = AppConfig(
         output_dir=Path(raw.get("output_dir", "./output")),
         log_level=raw.get("log_level", "info"),
@@ -170,6 +179,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         platforms=platforms,
         scheduler=_parse_scheduler(raw.get("scheduler", {})),
         network=network,
+        video=video,
     )
 
     _apply_env_overrides(config)

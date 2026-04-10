@@ -158,10 +158,15 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
         media_exts = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".gif"}
         for identifier in [url, note_id]:
             try:
-                run_opencli("xiaohongshu", "download",
-                            [identifier, "--output", str(assets_dir)],
-                            timeout=180)
-            except Exception:
+                result = run_opencli("xiaohongshu", "download",
+                                     [identifier, "--output", str(assets_dir)],
+                                     timeout=180)
+                if isinstance(result, list):
+                    failed = [r for r in result if isinstance(r, dict) and r.get("status") not in (None, "success")]
+                    for r in failed:
+                        log.warning("xiaohongshu download item failed for %s: %s", note_id, r)
+            except Exception as e:
+                log.warning("xiaohongshu download failed for %s (identifier=%s): %s", note_id, identifier, e)
                 continue
 
             self._flatten_assets(assets_dir)
@@ -170,6 +175,7 @@ class XiaohongshuAdapter(PlatformAdapter, adapter_name="xiaohongshu"):
             if files:
                 return [f"assets/{f.name}" for f in files]
 
+        log.warning("All media download attempts failed for xiaohongshu note %s", note_id)
         return []
 
     @staticmethod

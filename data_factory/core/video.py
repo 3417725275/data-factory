@@ -12,12 +12,57 @@ log = logging.getLogger(__name__)
 
 _IS_WINDOWS = sys.platform == "win32"
 
+_QUALITY_FORMAT_MAP = {
+    "480p": "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]",
+    "720p": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
+    "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]",
+    "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+}
+
+_QUALITY_FORMAT_NO_FFMPEG = {
+    "480p": "best[height<=480][ext=mp4]/best[height<=480]",
+    "720p": "best[height<=720][ext=mp4]/best[height<=720]",
+    "1080p": "best[height<=1080][ext=mp4]/best[height<=1080]",
+    "best": "best[ext=mp4]/best",
+}
+
 
 def _has_ffmpeg() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
-def download_video(url: str, output_dir: Path, filename: str = "video") -> Path | None:
+def _log_detailed_failure(url: str, stderr: str) -> None:
+    """Classify yt-dlp failure and log a specific, actionable message."""
+    s = stderr.lower() if stderr else ""
+    if "no video formats found" in s:
+        log.warning(
+            "yt-dlp: No video formats found for %s — "
+            "this usually means the platform requires login/cookies. "
+            "Bilibili should use 'opencli bilibili download' instead of yt-dlp.",
+            url,
+        )
+    elif "sign in to confirm" in s or "age" in s:
+        log.warning(
+            "yt-dlp: Age/login restriction for %s — "
+            "video requires authentication to download.",
+            url,
+        )
+    elif "private video" in s:
+        log.warning("yt-dlp: Video is private: %s", url)
+    elif "copyright" in s or "blocked" in s:
+        log.warning("yt-dlp: Video blocked (copyright/region): %s", url)
+    elif "http error 403" in s or "403" in s:
+        log.warning("yt-dlp: HTTP 403 Forbidden for %s — possible geo-restriction or anti-bot", url)
+    else:
+        log.warning("yt-dlp failed for %s: %s", url, stderr[:300] if stderr else "unknown error")
+
+
+def download_video(
+    url: str,
+    output_dir: Path,
+    filename: str = "video",
+    quality: str = "720p",
+) -> Path | None:
     """Download video via yt-dlp with automatic ffmpeg fallback.
 
     When ffmpeg is available, downloads best video+audio streams and merges them.
@@ -31,11 +76,11 @@ def download_video(url: str, output_dir: Path, filename: str = "video") -> Path 
     out_path = output_dir / f"{filename}.mp4"
 
     if _has_ffmpeg():
-        fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        fmt = _QUALITY_FORMAT_MAP.get(quality, _QUALITY_FORMAT_MAP["720p"])
         extra = ["--merge-output-format", "mp4"]
     else:
         log.info("ffmpeg not found — using pre-merged format (quality may be lower)")
-        fmt = "best[ext=mp4]/best"
+        fmt = _QUALITY_FORMAT_NO_FFMPEG.get(quality, _QUALITY_FORMAT_NO_FFMPEG["720p"])
         extra = []
 
     cmd = ["yt-dlp", "-f", fmt, *extra,
@@ -60,7 +105,7 @@ def download_video(url: str, output_dir: Path, filename: str = "video") -> Path 
             return best
 
         if result.returncode != 0:
-            log.warning("yt-dlp exit %d: %s", result.returncode, result.stderr[:300])
+            _log_detailed_failure(url, result.stderr)
         return None
     except subprocess.TimeoutExpired:
         log.warning("yt-dlp download timed out for %s", url)

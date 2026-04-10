@@ -32,7 +32,7 @@ def test_transcribe_should_run_for_video(tmp_path):
 def test_transcribe_writes_transcript_json(tmp_path, mocker):
     from data_factory.processors.transcribe import TranscribeProcessor
     from data_factory.core.storage import write_json, load_json
-    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig
+    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig, VideoConfig
 
     write_json(tmp_path / "meta.json", {
         "transcript_completed": False,
@@ -52,6 +52,7 @@ def test_transcribe_writes_transcript_json(tmp_path, mocker):
         platforms={},
         scheduler=SchedulerConfig(enabled=False),
         network=NetworkConfig(proxy="", timeout=30, retry=3),
+        video=VideoConfig(quality="720p"),
     )
 
     mocker.patch(

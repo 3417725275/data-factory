@@ -37,14 +37,18 @@ def _flatten_assets(assets_dir: Path):
         shutil.rmtree(sub, ignore_errors=True)
 
 
+_MEDIA_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://x.com/",
+}
+
+
 def _download_media_urls(urls: list[str], assets_dir: Path) -> list[str]:
     """Download a list of image/video URLs into assets_dir. Returns relative paths."""
     downloaded = []
     for i, url in enumerate(urls):
         try:
-            resp = requests.get(url, timeout=30, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            })
+            resp = requests.get(url, timeout=30, headers=_MEDIA_HEADERS)
             resp.raise_for_status()
             ct = resp.headers.get("content-type", "")
             if "jpeg" in ct or "jpg" in ct:
@@ -62,8 +66,10 @@ def _download_media_urls(urls: list[str], assets_dir: Path) -> list[str]:
             dest = assets_dir / f"media_{i + 1}{ext}"
             dest.write_bytes(resp.content)
             downloaded.append(f"assets/{dest.name}")
+        except requests.HTTPError as e:
+            log.warning("HTTP %d downloading media %s: %s", e.response.status_code if e.response else 0, url, e)
         except Exception as e:
-            log.debug("Failed to download media %s: %s", url, e)
+            log.warning("Failed to download media %s: %s", url, e)
     return downloaded
 
 

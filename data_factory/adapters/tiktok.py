@@ -51,7 +51,8 @@ class TikTokAdapter(PlatformAdapter, adapter_name="tiktok"):
         comments: list[dict] = []
         log.warning("TikTok comments not available via opencli for %s", url)
 
-        video_file = download_video(url, assets_dir)
+        quality = getattr(self, "_video_quality", "720p")
+        video_file = download_video(url, assets_dir, quality=quality)
 
         from datetime import datetime, timedelta, timezone
 

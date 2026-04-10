@@ -33,10 +33,11 @@ def test_bilibili_fetch(mocker, tmp_path):
     def mock_opencli(platform, command, args=None, **kwargs):
         if command == "comments":
             return comments_data
+        if command == "download":
+            return [{"bvid": "BV1test", "status": "success", "size": "10 MB"}]
         return video_data
 
     mocker.patch("data_factory.adapters.bilibili.run_opencli", side_effect=mock_opencli)
-    mocker.patch("data_factory.adapters.bilibili.download_video", return_value=None)
     output_dir = tmp_path / "bilibili" / "BV1test"
     adapter = BilibiliAdapter()
     result = adapter.fetch("https://www.bilibili.com/video/BV1test", output_dir)

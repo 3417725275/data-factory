@@ -76,7 +76,8 @@ class YouTubeAdapter(PlatformAdapter, adapter_name="youtube"):
             if _http_download(thumb_url, thumb_path):
                 assets.append("assets/thumbnail.jpg")
 
-        video_file = download_video(url, assets_dir)
+        quality = getattr(self, "_video_quality", "720p")
+        video_file = download_video(url, assets_dir, quality=quality)
 
         transcript_text = self._get_transcript(url)
         transcript_file = maybe_write_text(output_dir / "transcript.txt", transcript_text)

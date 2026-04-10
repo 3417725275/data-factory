@@ -49,9 +49,14 @@ def get_adapter(platform: str, config: AppConfig) -> PlatformAdapter:
         if "token" in params and pcfg:
             kwargs["token"] = pcfg.token
         if kwargs:
-            return cls(**kwargs)
+            adapter = cls(**kwargs)
+        else:
+            adapter = cls()
+    else:
+        adapter = cls()
 
-    return cls()
+    adapter._video_quality = config.video.quality
+    return adapter
 
 
 class Pipeline:

@@ -24,7 +24,7 @@ def test_images_should_run_if_not_downloaded(tmp_path):
 def test_images_downloads_from_platform_meta(tmp_path, mocker):
     from data_factory.processors.images import ImageDownloadProcessor
     from data_factory.core.storage import write_json, load_json
-    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig
+    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig, VideoConfig
 
     write_json(tmp_path / "meta.json", {
         "images_downloaded": False,
@@ -45,6 +45,7 @@ def test_images_downloads_from_platform_meta(tmp_path, mocker):
         platforms={},
         scheduler=SchedulerConfig(enabled=False),
         network=NetworkConfig(proxy="", timeout=30, retry=3),
+        video=VideoConfig(quality="720p"),
     )
 
     mocker.patch("data_factory.processors.images.download_file", return_value=True)

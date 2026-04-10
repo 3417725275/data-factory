@@ -9,7 +9,8 @@
 - `opencli youtube search` 返回的 URL 格式为 `https://www.youtube.com/watch?v=<id>`
 - 评论抓取在高峰期（UTC 14:00-20:00）可能超时，建议 rate_limit ≥ 2.0
 - 部分视频禁用了评论，`fetch_comments` 会返回空列表而非报错
-- 视频下载使用 `yt-dlp`，需要 `ffmpeg` 合并音视频流；无 ffmpeg 时自动降级为预合并格式
+- ⚠️ **opencli 没有 `youtube download` 命令**，视频下载使用裸 `yt-dlp`（无浏览器 cookies），年龄限制、版权、地区限制的视频可能失败。Agent 应在汇总中如实报告失败原因
+- 视频下载需要 `ffmpeg` 合并音视频流；无 ffmpeg 时自动降级为预合并格式
 - `opencli youtube transcript` 可获取字幕，保存为 `transcript.txt`
 
 ## Bilibili
@@ -17,7 +18,8 @@
 - `opencli bilibili search` 返回的 URL 格式为 `https://www.bilibili.com/video/<BVid>`
 - B站有反爬机制，建议 rate_limit ≥ 1.0，连续抓取超过 50 条可能触发验证码
 - 部分视频需要登录才能查看完整评论
-- 视频下载使用 `yt-dlp`（同 YouTube，需 ffmpeg 合并）
+- **视频下载使用 `opencli bilibili download <BVid> --quality 720p --output <dir>`**（内部调用 yt-dlp 并自动注入浏览器 cookies，解决了 yt-dlp 直接调用时无法读取 Chrome 锁定 cookie 数据库的问题）
+- ⚠️ **不要直接用 yt-dlp 下载 Bilibili 视频**：Bilibili API 要求登录态才能返回视频流地址，而 Chrome/Edge 运行时锁定 cookie 数据库导致 `--cookies-from-browser` 失败
 - 字幕使用 `opencli bilibili subtitle <BVid>` 获取
 - `opencli bilibili` 没有专门的视频信息命令，用 `search <BVid> --limit 1` 做最佳匹配
 
@@ -61,6 +63,7 @@
 
 ## TikTok
 
+- ⚠️ **opencli 没有 `tiktok download` 命令**，视频下载使用裸 `yt-dlp`（无浏览器 cookies），TikTok 反爬较严格，无 cookies 时频繁失败。Agent 应在汇总中如实报告
 - 视频下载依赖 `yt-dlp`（通过 `core.video.download_video` 统一调用），需确保已安装
 - 评论功能尚未在 opencli 中实现
 
@@ -79,7 +82,18 @@
 ## 通用
 
 - **⚠️ 串行执行（最重要）**：所有 `data-factory` CLI 命令必须逐条串行执行，禁止并发。`opencli` 依赖单一 Chrome 浏览器实例，同时运行多个命令会导致 "No tab with id"、"No window with id" 等 tab 冲突错误。搜索、抓取、刷新均需等待上一条命令完成后再执行下一条
-- **ffmpeg**：YouTube / Bilibili / TikTok 视频下载后需要 ffmpeg 合并音视频流。缺少 ffmpeg 时自动降级为 `best[ext=mp4]` 预合并格式（画质可能较低）
+- **视频画质**：`config.yaml` 中 `video.quality` 控制视频画质，可选 `480p`/`720p`/`1080p`/`best`，默认 `720p`。对 YouTube/TikTok 通过 yt-dlp 格式选择器实现，对 Bilibili 通过 `opencli bilibili download --quality` 实现
+- **ffmpeg**：YouTube / TikTok 视频下载后需要 ffmpeg 合并音视频流。缺少 ffmpeg 时自动降级为预合并格式（画质可能较低）。Bilibili 通过 opencli 下载已自动处理
 - **Windows `shell=True`**：在 Windows 上调用 `opencli`（.cmd 文件）时必须用 `shell=True`，且 URL 中的 `&` 等特殊字符需显式引号包裹
 - **编码**：Windows 默认 GBK 编码，subprocess 调用需指定 `encoding="utf-8", errors="replace"`
 - **opencli 激活**：首次使用需运行 `opencli doctor` 激活浏览器桥接，如未桥接需等待 4s 后重试，最多 3 次
+
+### opencli download 可用性
+
+| 平台 | opencli download | 视频下载方式 |
+|------|-----------------|-------------|
+| Bilibili | ✅ 有 | `opencli bilibili download`（自动注入浏览器 cookies） |
+| 小红书 | ✅ 有 | `opencli xiaohongshu download`（图片/视频） |
+| YouTube | ❌ 无 | `yt-dlp`（裸调用，无 cookies，部分视频可能失败） |
+| TikTok | ❌ 无 | `yt-dlp`（裸调用，无 cookies，反爬严格） |
+| Twitter | ⚠️ 不稳定 | `opencli twitter download` + Syndication API fallback |

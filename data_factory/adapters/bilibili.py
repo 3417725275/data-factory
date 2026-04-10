@@ -10,7 +10,6 @@ from data_factory.adapters.base import PlatformAdapter
 from data_factory.core.opencli import run_opencli
 from data_factory.core.schema import FetchResult
 from data_factory.core.storage import write_json, maybe_write_text, maybe_write_json, now_iso
-from data_factory.core.video import download_video
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +17,37 @@ log = logging.getLogger(__name__)
 def _extract_bvid(url: str) -> str:
     m = re.search(r"(BV[a-zA-Z0-9]+)", url)
     return m.group(1) if m else url.rstrip("/").split("/")[-1]
+
+
+def _download_via_opencli(bvid: str, output_dir: Path, quality: str = "720p") -> Path | None:
+    """Download video using ``opencli bilibili download`` which handles browser cookies."""
+    try:
+        result = run_opencli(
+            "bilibili", "download",
+            [bvid, "--quality", quality, "--output", str(output_dir)],
+            timeout=600,
+        )
+        rows = result if isinstance(result, list) else [result]
+        success = any(r.get("status") == "success" for r in rows if isinstance(r, dict))
+        if not success:
+            log.warning("opencli bilibili download reported non-success: %s", result)
+            return None
+    except Exception as e:
+        log.warning("opencli bilibili download failed: %s", e)
+        return None
+
+    candidates = sorted(output_dir.glob("*.mp4"), key=lambda p: p.stat().st_size, reverse=True)
+    if not candidates:
+        log.warning("No mp4 file found after opencli bilibili download")
+        return None
+
+    downloaded = candidates[0]
+    target = output_dir / "video.mp4"
+    if downloaded != target:
+        if target.exists():
+            target.unlink()
+        downloaded.rename(target)
+    return target
 
 
 class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
@@ -44,7 +74,8 @@ class BilibiliAdapter(PlatformAdapter, adapter_name="bilibili"):
             comments = []
         comments_file = maybe_write_json(output_dir / "comments.json", comments)
 
-        video_file = download_video(url, assets_dir)
+        quality = getattr(self, "_video_quality", "720p")
+        video_file = _download_via_opencli(bvid, assets_dir, quality)
         assets = []
         if video_file:
             rel = f"assets/{video_file.name}"

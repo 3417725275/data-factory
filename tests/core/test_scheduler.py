@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 def test_scheduler_creates_jobs_from_config():
     from data_factory.core.scheduler import DataFactoryScheduler
-    from data_factory.core.config import SchedulerConfig, SchedulerJob, AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig
+    from data_factory.core.config import SchedulerConfig, SchedulerJob, AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, VideoConfig
 
     config = AppConfig(
         output_dir=MagicMock(),
@@ -22,6 +22,7 @@ def test_scheduler_creates_jobs_from_config():
             ],
         ),
         network=NetworkConfig("", 30, 3),
+        video=VideoConfig(quality="720p"),
     )
 
     pipeline = MagicMock()

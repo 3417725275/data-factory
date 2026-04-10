@@ -7,7 +7,7 @@ from data_factory.core.schema import FetchResult
 
 def test_pipeline_run_full_new_item(tmp_path, mocker):
     from data_factory.core.pipeline import Pipeline
-    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig
+    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig, VideoConfig
 
     config = AppConfig(
         output_dir=tmp_path / "output",
@@ -20,6 +20,7 @@ def test_pipeline_run_full_new_item(tmp_path, mocker):
         platforms={"youtube": MagicMock(enabled=True, rate_limit=2.0)},
         scheduler=SchedulerConfig(enabled=False),
         network=NetworkConfig(proxy="", timeout=30, retry=3),
+        video=VideoConfig(quality="720p"),
     )
 
     output_dir = tmp_path / "output" / "youtube" / "abc123"
@@ -47,7 +48,7 @@ def test_pipeline_run_full_new_item(tmp_path, mocker):
 
 def test_pipeline_run_refresh_updates_comments(tmp_path, mocker):
     from data_factory.core.pipeline import Pipeline
-    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig
+    from data_factory.core.config import AppConfig, TranscribeConfig, WhisperApiConfig, WhisperLocalConfig, PlatformSubtitleConfig, NetworkConfig, SchedulerConfig, VideoConfig
     from data_factory.core.storage import write_json, load_json
 
     config = AppConfig(
@@ -61,6 +62,7 @@ def test_pipeline_run_refresh_updates_comments(tmp_path, mocker):
         platforms={"youtube": MagicMock(enabled=True, rate_limit=2.0)},
         scheduler=SchedulerConfig(enabled=False),
         network=NetworkConfig(proxy="", timeout=30, retry=3),
+        video=VideoConfig(quality="720p"),
     )
 
     output_dir = tmp_path / "output" / "youtube" / "abc123"
