@@ -17,7 +17,7 @@ def _has_ffmpeg() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
-def download_video(url: str, output_dir: Path, filename: str = "video") -> Path | None:
+def download_video(url: str, output_dir: Path, filename: str = "video", quality: str | None = None) -> Path | None:
     """Download video via yt-dlp with automatic ffmpeg fallback.
 
     When ffmpeg is available, downloads best video+audio streams and merges them.
@@ -31,13 +31,18 @@ def download_video(url: str, output_dir: Path, filename: str = "video") -> Path 
 
     out_path = output_dir / f"{filename}.mp4"
 
-    if _has_ffmpeg():
+    if quality and quality.isdigit():
+        # Convert simple quality like "720" to yt-dlp format selector
+        fmt = f"bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best"
+    elif quality:
+        fmt = quality
+    elif _has_ffmpeg():
         fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-        extra = ["--merge-output-format", "mp4"]
     else:
         log.info("ffmpeg not found — using pre-merged format (quality may be lower)")
         fmt = "best[ext=mp4]/best"
-        extra = []
+
+    extra = ["--merge-output-format", "mp4"] if _has_ffmpeg() else []
 
     cmd = [yt_dlp_path, "-f", fmt, *extra,
            "-o", str(out_path), "--no-playlist", "--no-warnings", url]
