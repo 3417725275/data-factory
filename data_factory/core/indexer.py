@@ -23,7 +23,7 @@ class Indexer:
             "items": {},
         }
 
-        refresh = meta.get("comments_refresh", {})
+        refresh = meta.get("comments_refresh") or {}
         index["items"][item_id] = {
             "title": meta.get("title", ""),
             "url": meta.get("url", ""),
@@ -31,8 +31,8 @@ class Indexer:
             "status": meta.get("status", ""),
             "fetched_at": meta.get("fetched_at", ""),
             "published_at": meta.get("published_at"),
-            "last_comment_refresh": refresh.get("last_refresh_at"),
-            "comment_count": refresh.get("last_comment_count", 0),
+            "last_comment_refresh": refresh.get("last_refresh_at") if refresh else None,
+            "comment_count": refresh.get("last_comment_count", 0) if refresh else 0,
             "path": f"{item_id}/",
         }
         index["count"] = len(index["items"])

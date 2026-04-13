@@ -31,11 +31,14 @@ def download_video(url: str, output_dir: Path, filename: str = "video", quality:
 
     out_path = output_dir / f"{filename}.mp4"
 
-    if quality and quality.isdigit():
-        # Convert simple quality like "720" to yt-dlp format selector
-        fmt = f"bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best"
-    elif quality:
-        fmt = quality
+    if quality:
+        # Extract numeric height from quality string (e.g., "720p" -> "720")
+        quality_num = ''.join(c for c in quality if c.isdigit())
+        if quality_num:
+            # Convert to yt-dlp format selector
+            fmt = f"bestvideo[height<={quality_num}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_num}][ext=mp4]/best"
+        else:
+            fmt = quality
     elif _has_ffmpeg():
         fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
     else:
