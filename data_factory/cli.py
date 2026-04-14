@@ -46,7 +46,10 @@ def search(ctx, platform, query, limit, do_fetch):
 
     urls = adapter.search(query, limit=limit)
     for url in urls:
-        click.echo(url)
+        # Fix Windows encoding issues with non-ASCII URLs
+        if isinstance(url, bytes):
+            url = url.decode('utf-8', errors='ignore')
+        click.echo(url.encode('utf-8', errors='ignore').decode('utf-8') if sys.platform == 'win32' else url)
 
     if do_fetch:
         from data_factory.core.pipeline import Pipeline
