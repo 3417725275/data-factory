@@ -49,13 +49,23 @@ def search(ctx, platform, query, limit, do_fetch):
         # Fix Windows encoding issues with non-ASCII URLs
         if isinstance(url, bytes):
             url = url.decode('utf-8', errors='ignore')
-        click.echo(url.encode('utf-8', errors='ignore').decode('utf-8') if sys.platform == 'win32' else url)
+        # Use direct stdout write to bypass click's encoding issues on Windows
+        if sys.platform == 'win32':
+            import io
+            sys.stdout.buffer.write(url.encode('utf-8', errors='ignore') + b'\n')
+        else:
+            click.echo(url)
 
     if do_fetch:
         from data_factory.core.pipeline import Pipeline
         pipeline = Pipeline(config)
         for url in urls:
-            click.echo(f"Fetching: {url}")
+            # Fix Windows encoding for fetch message
+            msg = f"Fetching: {url}"
+            if sys.platform == 'win32':
+                sys.stdout.buffer.write(msg.encode('utf-8', errors='ignore') + b'\n')
+            else:
+                click.echo(msg)
             pipeline.run_full(url, platform)
 
 
